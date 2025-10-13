@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - AZURE_FACE_KEY=${AZURE_FACE_KEY}
+      - AZURE_FACE_ENDPOINT=${AZURE_FACE_ENDPOINT}
+      - AZURE_SPEECH_KEY=${AZURE_SPEECH_KEY}
+      - AZURE_SERVICE_REGION=${AZURE_SERVICE_REGION}
+      - STT_SERVICE=${STT_SERVICE:-azure}
+    volumes:
+      - ./backend:/app
+      - ./backend/models:/app/models
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - jarvis-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    networks:
+      - jarvis-network
+    depends_on:
+      - backend
+
+networks:
+  jarvis-network:
+    driver: bridge

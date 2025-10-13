@@ -1,0 +1,2 @@
+# Directorio para modelos entrenados (.joblib, .pkl)
+# Los archivos de modelo se generarán desde los notebooks de entrenamiento
