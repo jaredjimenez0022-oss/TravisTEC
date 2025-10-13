@@ -14,4 +14,7 @@ echo.
 echo Iniciando servidor frontend...
 echo Frontend URL: http://localhost:3000
 echo.
+echo Abriendo navegador en 3 segundos...
+timeout /t 3 /nobreak >nul
+start http://localhost:3000
 npm run dev
