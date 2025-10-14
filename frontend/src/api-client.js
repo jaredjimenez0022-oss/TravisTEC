@@ -9,7 +9,7 @@ class APIClient {
         formData.append('audio', audioBlob, 'audio.webm');
         
         try {
-            const response = await fetch(`${this.baseURL}/api/transcribe`, {
+            const response = await fetch(`${this.baseURL}/api/v1/transcribe`, {
                 method: 'POST',
                 body: formData
             });
@@ -31,7 +31,7 @@ class APIClient {
         formData.append('image', imageBlob, 'frame.jpg');
         
         try {
-            const response = await fetch(`${this.baseURL}/api/recognize-face`, {
+            const response = await fetch(`${this.baseURL}/api/v1/face/sentiment`, {
                 method: 'POST',
                 body: formData
             });
@@ -50,20 +50,27 @@ class APIClient {
     
     async processCommand(text) {
         try {
-            const response = await fetch(`${this.baseURL}/api/process`, {
+            // text may be a string or an object (parsed payload)
+            const payload = (typeof text === 'string') ? { text } : text;
+
+            const response = await fetch(`${this.baseURL}/api/v1/command/execute`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ text })
+                body: JSON.stringify(payload)
             });
-            
+
             if (!response.ok) {
                 throw new Error('Error procesando comando');
             }
-            
+
             const data = await response.json();
-            return data.response;
+            // backend returns a dict - try to normalize
+            if (data.response) return data.response
+            if (data.result) return data.result
+            if (data.transcription) return data.transcription
+            return data
         } catch (error) {
             console.error('Error procesando comando:', error);
             throw error;
