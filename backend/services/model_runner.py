@@ -81,6 +81,9 @@ class ModelRunner:
     def get_available_models(self):
         """Obtener lista de modelos disponibles"""
         return list(self.models.keys())
+
+    def get_model(self, name):
+        return self.models.get(name)
     
     def reload_models(self):
         """Recargar todos los modelos"""

@@ -3,8 +3,9 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
-from services.azure_face import AzureFaceService
 from services.model_runner import ModelRunner
+from services.stt_service import STTService
+from services.emotion_local_simple import analyze_image_file
 from services.stt_service import STTService
 import os
 
@@ -20,9 +21,15 @@ app.add_middleware(
 )
 
 # Inicializar servicios
-azure_face = AzureFaceService()
 model_runner = ModelRunner()
 stt_service = STTService()
+
+# local emotion detector uses Haar cascades
+def _save_upload_to_temp(upload: UploadFile) -> str:
+    tmp_name = f"tmp_{upload.filename}"
+    with open(tmp_name, "wb") as f:
+        f.write(upload.file.read())
+    return tmp_name
 
 class TextRequest(BaseModel):
     text: str
@@ -53,19 +60,21 @@ async def transcribe_audio(audio: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/recognize-face")
-async def recognize_face(image: UploadFile = File(...)):
-    """
-    Reconocer rostro usando Azure Face API
+@app.post("/api/v1/face/sentiment")
+async def face_sentiment(image: UploadFile = File(...)):
+    """Analyze an uploaded image with the local emotion detector.
+
+    Returns a small JSON with dominant_emotion, face_count and details.
     """
     try:
-        # Leer imagen
-        image_data = await image.read()
-        
-        # Procesar con Azure Face
-        result = await azure_face.identify_face(image_data)
-        
-        return result
+        # save temporary file
+        tmp = _save_upload_to_temp(image)
+        res = analyze_image_file(tmp)
+        try:
+            os.remove(tmp)
+        except Exception:
+            pass
+        return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -82,6 +91,34 @@ async def process_command(request: TextRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/v1/bmi")
+async def predict_bmi(payload: dict):
+    """Predict bodyfat or BMI. Expected JSON: {height, weight, age}
+
+    If a trained `bmi_model` is available it will be used; otherwise we
+    return the formula BMI = weight / height^2.
+    """
+    try:
+        h = float(payload.get('height'))
+        w = float(payload.get('weight'))
+        age = float(payload.get('age', 30))
+    except Exception:
+        raise HTTPException(status_code=400, detail='Invalid payload, need height, weight, age')
+
+    try:
+        if 'bmi_model' in model_runner.get_available_models():
+            m = model_runner.models.get('bmi_model')
+            if hasattr(m, 'predict'):
+                # model expects [height_m, weight_kg, age]
+                pred = m.predict([[h, w, age]])
+                return {'method': 'bmi_model', 'bodyfat': float(pred[0])}
+        # fallback: compute BMI
+        bmi = w / (h*h)
+        return {'method': 'formula', 'bmi': bmi}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/health")
 async def health_check():
     """
@@ -90,7 +127,7 @@ async def health_check():
     return {
         "status": "healthy",
         "services": {
-            "azure_face": azure_face.is_configured(),
+            "local_face_detector": True,
             "model_runner": model_runner.is_ready(),
             "stt_service": stt_service.is_available()
         }
