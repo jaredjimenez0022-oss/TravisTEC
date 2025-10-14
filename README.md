@@ -161,6 +161,42 @@ Procesa comando de texto con modelo ML.
 - **Input:** `{ "text": "comando" }`
 - **Output:** `{ "response": "respuesta" }`
 
+### `POST /api/v1/bmi` (nuevo)
+Calcula IMC o estima BodyFat usando el modelo entrenado `bmi_model` si está disponible.
+- **Input:** JSON `{ "height": <meters>, "weight": <kg>, "age": <years> }`
+- **Output (modelo):** `{ "bodyfat": <percent>, "units": "%", "method": "bmi_model" }`
+- **Output (fórmula):** `{ "bmi": <kg/m2>, "units": "kg/m2", "method": "formula" }`
+
+### `POST /api/v1/face/sentiment` (local fallback)
+Devuelve la emoción detectada usando el detector local (heurístico Haar-cascade).
+- **Input:** multipart/form-data con campo `image` (jpg/png/webp)
+- **Output:** `{ "dominant_emotion": "happiness|neutral|no_face", "face_count": n, "details": {...} }`
+
+## 🧪 Comandos rápidos (smoke tests)
+Desde `backend/` puedes ejecutar los scripts de prueba rápidos:
+
+- Ejecutar detector de emoción simple:
+```powershell
+python scripts\run_smoke_emotion_simple.py
+```
+
+- Entrenar y guardar modelo BMI (usa `backend/datasets/bodyfat.csv`):
+```powershell
+python scripts\train_bmi_model.py
+```
+
+- Probar el modelo BMI guardado:
+```powershell
+python scripts\run_smoke_bmi.py
+```
+
+- Listar modelos cargados en tiempo de ejecución (usa Python REPL en `backend/`):
+```powershell
+python -c "import sys; sys.path.insert(0, 'backend'); from services import model_runner as mr; print(list(mr._runner.models.keys()))"
+```
+
+Estas herramientas te permiten verificar rápidamente las funcionalidades sin iniciar el servidor.
+
 ### `GET /api/health`
 Verifica estado del sistema.
 - **Output:** `{ "status": "healthy", "services": {...} }`
