@@ -1,0 +1,86 @@
+.emotion-display {
+  background: white;
+  border-radius: 15px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.emotion-display.empty {
+  text-align: center;
+  color: #a0aec0;
+  padding: 2rem;
+}
+
+.dominant-emotion {
+  text-align: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+  color: white;
+  margin-bottom: 1.5rem;
+}
+
+.dominant-emotion .emoji {
+  font-size: 4rem;
+  margin-bottom: 0.5rem;
+}
+
+.dominant-emotion h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  text-transform: capitalize;
+}
+
+.confidence {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.emotion-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.emotion-bar {
+  display: grid;
+  grid-template-columns: 120px 1fr 60px;
+  align-items: center;
+  gap: 1rem;
+}
+
+.emotion-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.emotion-label span:first-child {
+  font-size: 1.5rem;
+}
+
+.emotion-name {
+  text-transform: capitalize;
+}
+
+.bar-container {
+  height: 24px;
+  background: #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  transition: width 0.5s ease;
+  border-radius: 12px;
+}
+
+.emotion-bar .value {
+  text-align: right;
+  font-weight: 600;
+  color: #667eea;
+}

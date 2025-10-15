@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Backend real con ML y Azure
   backend:
     build:
       context: ./backend
@@ -20,22 +21,58 @@ services:
     networks:
       - jarvis-network
 
+  # Frontend React
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend-react
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     volumes:
-      - ./frontend:/app
+      - ./frontend-react:/app
       - /app/node_modules
     environment:
       - VITE_API_URL=http://localhost:8000
+      - VITE_USE_MOCK=false
+      - VITE_MOCK_API_URL=http://localhost:3001
     networks:
       - jarvis-network
     depends_on:
       - backend
+      - mock-server
+
+  # Mock Server para desarrollo/testing
+  mock-server:
+    build:
+      context: ./mock-server
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./mock-server:/app
+      - /app/node_modules
+    networks:
+      - jarvis-network
+    command: npm start
+
+  # Base de datos stub (PostgreSQL para futuras features)
+  db-stub:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=jarvis
+      - POSTGRES_PASSWORD=jarvis123
+      - POSTGRES_DB=jarvis_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - jarvis-network
 
 networks:
   jarvis-network:
     driver: bridge
+
+volumes:
+  db-data:
+

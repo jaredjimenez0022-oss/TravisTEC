@@ -1,0 +1,48 @@
+.audio-recorder {
+  padding: 1rem;
+}
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f7fafc;
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.recording-indicator.active {
+  background: #fff5f5;
+  border-color: #fc8181;
+}
+
+.pulse {
+  width: 12px;
+  height: 12px;
+  background: #cbd5e0;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.recording-indicator.active .pulse {
+  background: #fc8181;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.recording-indicator span {
+  font-weight: 500;
+  color: #2d3748;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.5;
+  }
+}

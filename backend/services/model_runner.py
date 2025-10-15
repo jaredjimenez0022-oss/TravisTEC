@@ -68,11 +68,12 @@ class ModelRunner:
                 dow = params.get("day_of_week", params.get("day"))
                 if isinstance(dow, str):
                     mapping = {
-                        "monday":0,"mon":0,"martes":1,"tuesday":1,"tue":1,
-                        "wednesday":2,"wed":2,"miercoles":2,"miernes":2,
+                        "monday":0,"mon":0,"lunes":0,
+                        "tuesday":1,"tue":1,"martes":1,
+                        "wednesday":2,"wed":2,"miercoles":2,"miércoles":2,
                         "thursday":3,"thu":3,"jueves":3,
                         "friday":4,"fri":4,"viernes":4,
-                        "saturday":5,"sat":5,"sabado":5,
+                        "saturday":5,"sat":5,"sabado":5,"sábado":5,
                         "sunday":6,"sun":6,"domingo":6
                     }
                     key = dow.strip().lower()

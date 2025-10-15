@@ -1,0 +1,287 @@
+{
+  "info": {
+    "name": "Jarvis TEC API",
+    "description": "Colección completa de endpoints para Jarvis TEC - Asistente inteligente con reconocimiento facial y procesamiento de voz",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "mock_url",
+      "value": "http://localhost:3001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Verifica el estado de salud del sistema y servicios disponibles"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "url": "{{base_url}}/api/health"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"status\": \"healthy\",\n  \"timestamp\": \"2025-10-15T12:00:00Z\",\n  \"services\": {\n    \"face_api\": \"available\",\n    \"speech_api\": \"available\",\n    \"ml_models\": \"loaded\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Face Recognition",
+      "item": [
+        {
+          "name": "Detect Face & Emotions",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": "/path/to/image.jpg",
+                  "description": "Imagen con rostro a analizar"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/face/sentiment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "face", "sentiment"]
+            },
+            "description": "Detecta rostros y analiza emociones en una imagen"
+          },
+          "response": [
+            {
+              "name": "Success - Face Detected",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{base_url}}/api/v1/face/sentiment"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"face_detected\": true,\n  \"face_count\": 1,\n  \"dominant_emotion\": \"happiness\",\n  \"attributes\": {\n    \"emotion\": {\n      \"happiness\": 0.85,\n      \"sadness\": 0.05,\n      \"anger\": 0.03,\n      \"surprise\": 0.04,\n      \"neutral\": 0.03\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Speech & Transcription",
+      "item": [
+        {
+          "name": "Transcribe Audio",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "src": "/path/to/audio.webm",
+                  "description": "Archivo de audio a transcribir"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/transcribe",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "transcribe"]
+            },
+            "description": "Transcribe audio a texto usando Azure Speech Services"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{base_url}}/api/v1/transcribe"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"transcription\": \"TravisTEC predice el precio de Bitcoin para los próximos 5 años\",\n  \"confidence\": 0.95,\n  \"language\": \"es-ES\",\n  \"duration_ms\": 2500\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Command Processing",
+      "item": [
+        {
+          "name": "Execute Command",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"predice el precio de bitcoin\",\n  \"task\": \"bitcoin\",\n  \"params\": {\n    \"years\": 5\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/command/execute",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "command", "execute"]
+            },
+            "description": "Procesa un comando y ejecuta el modelo ML correspondiente"
+          },
+          "response": [
+            {
+              "name": "Bitcoin Prediction",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{base_url}}/api/v1/command/execute"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"response\": \"El precio de Bitcoin en los próximos 5 años se estima en $85,000 con tendencia alcista.\",\n  \"task\": \"bitcoin\",\n  \"params\": {\"years\": 5},\n  \"processed_at\": \"2025-10-15T12:00:00Z\",\n  \"confidence\": 0.92\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ML Predictions",
+      "item": [
+        {
+          "name": "Calculate BMI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"height\": 1.75,\n  \"weight\": 70,\n  \"age\": 30\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/bmi",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "bmi"]
+            },
+            "description": "Calcula el BMI y estima el porcentaje de grasa corporal"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{base_url}}/api/v1/bmi"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"bmi\": 22.86,\n  \"bodyfat\": 18.35,\n  \"units\": \"kg/m²\",\n  \"method\": \"bmi_model\",\n  \"height\": 1.75,\n  \"weight\": 70,\n  \"age\": 30\n}"
+            }
+          ]
+        },
+        {
+          "name": "Predict Stock Price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"BTC\",\n  \"years\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/predict/stock",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "predict", "stock"]
+            },
+            "description": "Predice el precio de una acción o criptomoneda"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{base_url}}/api/v1/predict/stock"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"symbol\": \"BTC\",\n  \"predictions\": [\n    {\"year\": 2026, \"predicted_price\": \"65432.50\", \"confidence\": \"0.85\"},\n    {\"year\": 2027, \"predicted_price\": \"72100.30\", \"confidence\": \"0.80\"},\n    {\"year\": 2028, \"predicted_price\": \"79850.75\", \"confidence\": \"0.75\"},\n    {\"year\": 2029, \"predicted_price\": \"85200.60\", \"confidence\": \"0.72\"},\n    {\"year\": 2030, \"predicted_price\": \"91500.25\", \"confidence\": \"0.70\"}\n  ],\n  \"model\": \"mock_lstm\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Recommend Movie",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 123,\n  \"genre\": \"Sci-Fi\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/recommend/movie",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "recommend", "movie"]
+            },
+            "description": "Recomienda películas basadas en preferencias del usuario"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{base_url}}/api/v1/recommend/movie"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"recommendation\": {\n    \"title\": \"Inception\",\n    \"rating\": 8.8,\n    \"genre\": \"Sci-Fi\",\n    \"year\": 2010\n  },\n  \"confidence\": 0.88,\n  \"model\": \"collaborative_filtering\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

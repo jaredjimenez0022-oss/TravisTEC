@@ -19,12 +19,12 @@ def main():
         return
 
     df = pd.read_csv(DATA)
-    # Expecting columns: Age, Weight_kg, Height_m, BodyFat
-    if not {'Age','Weight_kg','Height_m','BodyFat'}.issubset(df.columns):
-        print("Dataset doesn't contain required columns. Expected Age, Weight_kg, Height_m, BodyFat")
+    # Expecting columns: Age, Weight, Height, BodyFat (real column names)
+    if not {'Age','Weight','Height','BodyFat'}.issubset(df.columns):
+        print("Dataset doesn't contain required columns. Expected Age, Weight, Height, BodyFat")
         return
 
-    X = df[['Height_m','Weight_kg','Age']]
+    X = df[['Height','Weight','Age']]
     y = df['BodyFat']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
