@@ -154,35 +154,39 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
   const parseCommand = (text) => {
     const t = text.toLowerCase();
     
-    if (!t.includes('travistec') && !t.includes('travis tec')) {
+    // Más flexible - no requiere exactamente "travistec"
+    if (!t.includes('travis') && t.length < 3) {
       return null;
     }
 
-    let payloadText = t.replace('travis tec', '').replace('travistec', '').trim();
+    // Limpiar texto
+    let payloadText = t.replace('travis tec', '').replace('travistec', '').replace('travis', '').trim();
 
     // Extraer números y palabras clave
     const numbers = payloadText.match(/\d+(\.\d+)?/g) || [];
     const params = {};
     let task = 'unknown';
 
-    // 1) travisTEC predice el precio del bitcoin
-    if (payloadText.includes('bitcoin')) {
+    // 1) Bitcoin - buscar en cualquier parte del texto (predicción a CORTO PLAZO)
+    if (payloadText.match(/\b(bitcoin|btc|bit coin)\b/i)) {
       task = 'bitcoin';
-      // Sin parámetros - usa datos recientes
+      if (numbers.length > 0) {
+        params.days = parseInt(numbers[0]); // Cambiado a días
+      }
     }
 
-    // 2) travisTEC recomienda una pelicula
-    else if (payloadText.includes('pelicula') || payloadText.includes('película') || payloadText.includes('recomienda')) {
+    // 2) Película - más flexible (acepta plural y singular)
+    else if (payloadText.match(/\b(pel[ií]culas?|movies?|recomienda|recomendaci[óo]n|film|films)\b/i)) {
       task = 'movie';
       // Extraer título después de "pelicula"
-      const match = payloadText.match(/pel[íi]cula\s+(.+)/);
+      const match = payloadText.match(/pel[íi]culas?\s+(.+)/);
       if (match) {
         params.title = match[1].trim();
       }
     }
 
-    // 3) travisTEC Predice el precio de un automovil (año y kilometraje)
-    else if (payloadText.includes('automovil') || payloadText.includes('automóvil') || payloadText.includes('coche') || payloadText.includes('carro')) {
+    // 3) Automóvil - más variaciones (acepta plurales y "teccar")
+    else if (payloadText.match(/\b(autom[óo]viles?|autos?|coches?|carros?|cars?|veh[íi]culos?|teccar|tec\s*car)\b/i)) {
       task = 'car';
       if (numbers.length >= 2) {
         params.year = parseInt(numbers[0], 10);
@@ -190,16 +194,16 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
       }
     }
 
-    // 4) travisTEC Predice el precio del SP500 (tiempo en años)
-    else if (payloadText.includes('sp500') || payloadText.includes('sp 500') || payloadText.includes('sp50')) {
+    // 4) SP500 - muy flexible (acepta 500, 507, 50, etc.) - predicción a CORTO PLAZO
+    else if (payloadText.match(/\b(sp\s*[45]\d{2}|sp\s*50\d?|s\s*[&y]?\s*p\s*[45]\d{2}|s\s*[&y]?\s*p\s*50\d?|standard|sandp|s\s*and\s*p)\b/i)) {
       task = 'sp500';
       if (numbers.length > 0) {
-        params.years = parseFloat(numbers[0]);
+        params.days = parseInt(numbers[0]); // Cambiado a días
       }
     }
 
-    // 5) travisTEC Predice la masa corporal (altura, peso, edad)
-    else if (payloadText.includes('masa corporal') || payloadText.includes('imc') || payloadText.includes('grasa')) {
+    // 5) Masa corporal - más variaciones
+    else if (payloadText.match(/\b(masa\s*corporal|imc|bmi|grasa|peso|altura)\b/i)) {
       task = 'bmi';
       if (numbers.length >= 2) {
         params.height = parseFloat(numbers[0]);
@@ -210,16 +214,16 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
       }
     }
 
-    // 6) travisTEC predice el precio del aguacate (tiempo en años)
-    else if (payloadText.includes('aguacate') || payloadText.includes('avocado')) {
+    // 6) Aguacate - más flexible (acepta plurales) - predicción a CORTO PLAZO
+    else if (payloadText.match(/\b(aguacates?|avocados?|paltas?)\b/i)) {
       task = 'avocado';
       if (numbers.length > 0) {
-        params.years = parseFloat(numbers[0]);
+        params.days = parseInt(numbers[0]); // Cambiado a días
       }
     }
 
-    // 7) Predecir la cantidad de crimenes por dia en Londres (día de la semana)
-    else if (payloadText.includes('londres') || payloadText.includes('london')) {
+    // 7) Londres - más flexible
+    else if (payloadText.match(/\b(londres|london)\b/i)) {
       task = 'london';
       const days = ['lunes', 'martes', 'miercoles', 'miércoles', 'jueves', 'viernes', 'sabado', 'sábado', 'domingo'];
       const foundDay = days.find(d => payloadText.includes(d));
@@ -228,8 +232,8 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
       }
     }
 
-    // 8) travisTEC predecir la cantidad de crimenes por dia en chicago (día de la semana)
-    else if (payloadText.includes('chicago')) {
+    // 8) Chicago - más flexible
+    else if (payloadText.match(/\b(chicago)\b/i)) {
       task = 'chicago';
       const days = ['lunes', 'martes', 'miercoles', 'miércoles', 'jueves', 'viernes', 'sabado', 'sábado', 'domingo'];
       const foundDay = days.find(d => payloadText.includes(d));
@@ -238,19 +242,33 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
       }
     }
 
-    // 9) travisTEC clasifica el tipo de cirrosis de un paciente
-    else if (payloadText.includes('cirrosis')) {
+    // 9) Cirrosis - más flexible (acepta plurales)
+    else if (payloadText.match(/\b(cirrosis|cirrhosis|h[íi]gados?)\b/i)) {
       task = 'cirrhosis';
-      // Extraer valores si se dan parámetros numéricos
-      if (numbers.length > 0) {
-        params.features = numbers.map(n => parseFloat(n));
+      // Extraer edad y bilirrubina si se dan parámetros numéricos
+      if (numbers.length >= 1) {
+        params.age = parseFloat(numbers[0]) * 365; // Convertir años a días
+      }
+      if (numbers.length >= 2) {
+        params.bilirubin = parseFloat(numbers[1]);
       }
     }
 
-    // 10) travisTEC Predecir el precio de los viajes de un avion (lugar y mes)
-    else if (payloadText.includes('avion') || payloadText.includes('avión') || payloadText.includes('vuelo')) {
+    // 10) Avión - más flexible (acepta plurales)
+    else if (payloadText.match(/\b(aviones?|vuelos?|flights?|aerol[íi]neas?)\b/i)) {
       task = 'airline';
-      // Extraer mes
+      // Extraer mes, día y distancia
+      if (numbers.length >= 1) {
+        params.month = parseInt(numbers[0], 10);  // Primer número = mes
+      }
+      if (numbers.length >= 2) {
+        params.day = parseInt(numbers[1], 10);  // Segundo número = día
+      }
+      if (numbers.length >= 3) {
+        params.distance = parseInt(numbers[2], 10);  // Tercer número = distancia en millas
+      }
+      
+      // Extraer mes por nombre
       const months = {
         'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
         'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
@@ -258,14 +276,6 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
       const foundMonth = Object.keys(months).find(m => payloadText.includes(m));
       if (foundMonth) {
         params.month = months[foundMonth];
-      } else if (numbers.length > 0) {
-        params.month = parseInt(numbers[0], 10);
-      }
-      
-      // Extraer lugar
-      const placeMatch = payloadText.match(/(?:desde|a|hacia|para)\s+([a-záéíóúñ]+)/i);
-      if (placeMatch) {
-        params.location = placeMatch[1];
       }
     }
 
