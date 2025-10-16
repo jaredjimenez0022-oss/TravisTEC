@@ -4,20 +4,38 @@ import './Results.css';
 
 function Results() {
   const location = useLocation();
-  const { logs = [], emotions = null } = location.state || {};
+  
+  // Recibir logs separados por sistema
+  const { 
+    faceRecognitionLogs = [], 
+    voiceCommandLogs = [],
+    emotions = null 
+  } = location.state || {};
 
-  const getLogStats = () => {
-    const stats = {
-      total: logs.length,
-      success: logs.filter(l => l.type === 'success').length,
-      error: logs.filter(l => l.type === 'error').length,
-      info: logs.filter(l => l.type === 'info').length,
-      warning: logs.filter(l => l.type === 'warning').length
+  // Estadísticas para Reconocimiento Facial
+  const getFaceStats = () => {
+    return {
+      total: faceRecognitionLogs.length,
+      success: faceRecognitionLogs.filter(l => l.type === 'success').length,
+      error: faceRecognitionLogs.filter(l => l.type === 'error').length,
+      info: faceRecognitionLogs.filter(l => l.type === 'info').length,
+      warning: faceRecognitionLogs.filter(l => l.type === 'warning').length
     };
-    return stats;
   };
 
-  const stats = getLogStats();
+  // Estadísticas para Comandos de Voz
+  const getVoiceStats = () => {
+    return {
+      total: voiceCommandLogs.length,
+      success: voiceCommandLogs.filter(l => l.type === 'success').length,
+      error: voiceCommandLogs.filter(l => l.type === 'error').length,
+      info: voiceCommandLogs.filter(l => l.type === 'info').length,
+      warning: voiceCommandLogs.filter(l => l.type === 'warning').length
+    };
+  };
+
+  const faceStats = getFaceStats();
+  const voiceStats = getVoiceStats();
 
   return (
     <div className="results-page">
@@ -27,35 +45,29 @@ function Results() {
       </div>
 
       <div className="stats-grid">
-        <div className="stat-card total">
-          <div className="stat-icon">📝</div>
+        {/* Estadísticas de Reconocimiento Facial */}
+        <div className="stat-card facial-section">
+          <div className="stat-icon">�</div>
           <div className="stat-content">
-            <h3>Total de Eventos</h3>
-            <p className="stat-value">{stats.total}</p>
+            <h3>Reconocimiento Facial</h3>
+            <div className="stat-details">
+              <p className="stat-value">Total: {faceStats.total}</p>
+              <p className="stat-mini success">✅ {faceStats.success}</p>
+              <p className="stat-mini error">❌ {faceStats.error}</p>
+            </div>
           </div>
         </div>
 
-        <div className="stat-card success">
-          <div className="stat-icon">✅</div>
+        {/* Estadísticas de Comandos de Voz */}
+        <div className="stat-card voice-section">
+          <div className="stat-icon">🎤</div>
           <div className="stat-content">
-            <h3>Exitosos</h3>
-            <p className="stat-value">{stats.success}</p>
-          </div>
-        </div>
-
-        <div className="stat-card error">
-          <div className="stat-icon">❌</div>
-          <div className="stat-content">
-            <h3>Errores</h3>
-            <p className="stat-value">{stats.error}</p>
-          </div>
-        </div>
-
-        <div className="stat-card info">
-          <div className="stat-icon">ℹ️</div>
-          <div className="stat-content">
-            <h3>Informativos</h3>
-            <p className="stat-value">{stats.info}</p>
+            <h3>Comandos de Voz</h3>
+            <div className="stat-details">
+              <p className="stat-value">Total: {voiceStats.total}</p>
+              <p className="stat-mini success">✅ {voiceStats.success}</p>
+              <p className="stat-mini error">❌ {voiceStats.error}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -66,25 +78,46 @@ function Results() {
           <EmotionDisplay emotions={emotions} />
         </div>
 
-        <div className="logs-result">
-          <h2>Registro Completo</h2>
-          <div className="logs-list">
-            {logs.length === 0 ? (
-              <div className="empty-state">
-                <p>No hay registros de actividad</p>
-                <Link to="/capture" className="btn btn-primary">
-                  Iniciar Captura
-                </Link>
-              </div>
-            ) : (
-              logs.map(log => (
-                <div key={log.id} className={`log-item ${log.type}`}>
-                  <span className="log-timestamp">{log.timestamp}</span>
-                  <span className="log-type">{log.type.toUpperCase()}</span>
-                  <span className="log-message">{log.message}</span>
+        {/* Registros Separados por Sistema */}
+        <div className="logs-container-dual">
+          {/* Log de Reconocimiento Facial */}
+          <div className="logs-result facial-logs">
+            <h2>📸 Registro de Reconocimiento Facial</h2>
+            <div className="logs-list">
+              {faceRecognitionLogs.length === 0 ? (
+                <div className="empty-state">
+                  <p>No hay actividad de reconocimiento facial</p>
                 </div>
-              ))
-            )}
+              ) : (
+                faceRecognitionLogs.map(log => (
+                  <div key={log.id} className={`log-item ${log.type}`}>
+                    <span className="log-timestamp">{log.timestamp}</span>
+                    <span className="log-type">{log.type.toUpperCase()}</span>
+                    <span className="log-message">{log.message}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Log de Comandos de Voz */}
+          <div className="logs-result voice-logs">
+            <h2>🎤 Registro de Comandos de Voz</h2>
+            <div className="logs-list">
+              {voiceCommandLogs.length === 0 ? (
+                <div className="empty-state">
+                  <p>No hay actividad de comandos de voz</p>
+                </div>
+              ) : (
+                voiceCommandLogs.map(log => (
+                  <div key={log.id} className={`log-item ${log.type}`}>
+                    <span className="log-timestamp">{log.timestamp}</span>
+                    <span className="log-type">{log.type.toUpperCase()}</span>
+                    <span className="log-message">{log.message}</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>

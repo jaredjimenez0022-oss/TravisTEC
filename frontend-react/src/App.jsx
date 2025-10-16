@@ -10,7 +10,7 @@ function App() {
       <div className="app">
         <nav className="navbar">
           <div className="nav-brand">
-            <Link to="/">🤖 Jarvis TEC</Link>
+            <Link to="/">JarvisTEC</Link>
           </div>
           <div className="nav-links">
             <Link to="/">Inicio</Link>
@@ -28,7 +28,7 @@ function App() {
         </main>
 
         <footer className="footer">
-          <p>Jarvis TEC © 2025 - Asistente Inteligente con IA</p>
+          <p>JarvisTEC © 2025 - Asistente Inteligente con IA</p>
         </footer>
       </div>
     </Router>

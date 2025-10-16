@@ -11,47 +11,65 @@ function Capture() {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isAudioActive, setIsAudioActive] = useState(false);
   const [currentEmotions, setCurrentEmotions] = useState(null);
-  const [logs, setLogs] = useState([]);
+  
+  // REGISTROS SEPARADOS PARA CADA SISTEMA
+  const [faceRecognitionLogs, setFaceRecognitionLogs] = useState([]); // 📸 Logs de reconocimiento facial
+  const [voiceCommandLogs, setVoiceCommandLogs] = useState([]); // 🎤 Logs de comandos de voz
+  
   const [snapshotPreview, setSnapshotPreview] = useState(null);
   const navigate = useNavigate();
 
-  const addLog = (message, type = 'info') => {
+  // Función para agregar log al sistema de RECONOCIMIENTO FACIAL
+  const addFaceLog = (message, type = 'info') => {
     const newLog = {
       id: Date.now(),
       message,
       type,
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: new Date().toLocaleTimeString(),
+      system: 'face'
     };
-    setLogs(prev => [newLog, ...prev].slice(0, 20));
+    setFaceRecognitionLogs(prev => [newLog, ...prev].slice(0, 20));
+  };
+
+  // Función para agregar log al sistema de COMANDOS DE VOZ
+  const addVoiceLog = (message, type = 'info') => {
+    const newLog = {
+      id: Date.now() + 1, // +1 para evitar IDs duplicados
+      message,
+      type,
+      timestamp: new Date().toLocaleTimeString(),
+      system: 'voice'
+    };
+    setVoiceCommandLogs(prev => [newLog, ...prev].slice(0, 20));
   };
 
   // Controles para el sistema de CÁMARA (emociones)
   const handleStartCamera = () => {
     setIsCameraActive(true);
-    addLog('📸 Sistema de reconocimiento facial INICIADO', 'success');
+    addFaceLog('📸 Sistema de reconocimiento facial INICIADO', 'success');
   };
 
   const handleStopCamera = () => {
     setIsCameraActive(false);
     setCurrentEmotions(null);
-    addLog('📸 Sistema de reconocimiento facial DETENIDO', 'info');
+    addFaceLog('📸 Sistema de reconocimiento facial DETENIDO', 'info');
   };
 
   // Controles para el sistema de AUDIO (comandos de voz)
   const handleStartAudio = () => {
     setIsAudioActive(true);
-    addLog('🎤 Sistema de comandos de voz INICIADO', 'success');
+    addVoiceLog('🎤 Sistema de comandos de voz INICIADO', 'success');
   };
 
   const handleStopAudio = () => {
     setIsAudioActive(false);
-    addLog('🎤 Sistema de comandos de voz DETENIDO', 'info');
+    addVoiceLog('🎤 Sistema de comandos de voz DETENIDO', 'info');
   };
 
   const handleSnapshot = (imageBlob) => {
     const url = URL.createObjectURL(imageBlob);
     setSnapshotPreview(url);
-    addLog('Foto capturada', 'success');
+    addFaceLog('📷 Foto capturada correctamente', 'success');
     
     // Limpiar URL después de 30 segundos
     setTimeout(() => URL.revokeObjectURL(url), 30000);
@@ -63,18 +81,18 @@ function Capture() {
       
       if (faceData.attributes && faceData.attributes.emotion) {
         setCurrentEmotions(faceData.attributes.emotion);
-        addLog(`Emoción detectada: ${faceData.dominant_emotion || 'N/A'}`, 'success');
+        addFaceLog(`😊 Emoción detectada: ${faceData.dominant_emotion || 'N/A'}`, 'success');
       } else if (faceData.dominant_emotion) {
         // Formato simple del mock
         const emotions = faceData.details || { [faceData.dominant_emotion]: 0.8 };
         setCurrentEmotions(emotions);
-        addLog(`Emoción detectada: ${faceData.dominant_emotion}`, 'success');
+        addFaceLog(`😊 Emoción detectada: ${faceData.dominant_emotion}`, 'success');
       } else {
-        addLog(faceData.message || 'No se detectó rostro', 'warning');
+        addFaceLog(faceData.message || 'No se detectó rostro', 'warning');
       }
     } catch (error) {
       console.error('Error procesando rostro:', error);
-      addLog(`Error: ${error.message}`, 'error');
+      addFaceLog(`❌ Error: ${error.message}`, 'error');
     }
   };
 
@@ -83,37 +101,38 @@ function Capture() {
       console.log('📝 handleTranscription llamado con:', audioOrText);
       if (typeof audioOrText === 'string') {
         // Ya es texto del Web Speech API
-        addLog(`🎤 Transcripción: ${audioOrText}`, 'info');
+        addVoiceLog(`🎤 Transcripción: "${audioOrText}"`, 'info');
       } else {
         // Es un Blob, enviarlo al backend
         const transcription = await apiClient.transcribeAudio(audioOrText);
-        addLog(`🎤 Transcripción: ${transcription}`, 'info');
+        addVoiceLog(`🎤 Transcripción: "${transcription}"`, 'info');
       }
     } catch (error) {
       console.error('❌ Error transcribiendo:', error);
-      addLog(`❌ Error transcribiendo: ${error.message}`, 'error');
+      addVoiceLog(`❌ Error transcribiendo: ${error.message}`, 'error');
     }
   };
 
   const handleCommand = async (command) => {
     try {
       console.log('🎯 handleCommand llamado con:', command);
-      addLog(`🎯 Comando parseado: ${JSON.stringify(command)}`, 'info');
+      addVoiceLog(`🎯 Comando parseado: ${command.task || 'desconocido'}`, 'info');
       
       const response = await apiClient.processCommand(command);
       console.log('✅ Respuesta del servidor:', response);
       
-      addLog(`✅ Respuesta: ${response}`, 'success');
+      addVoiceLog(`✅ ${response}`, 'success');
     } catch (error) {
       console.error('❌ Error procesando comando:', error);
-      addLog(`❌ Error procesando comando: ${error.message}`, 'error');
+      addVoiceLog(`❌ Error: ${error.message}`, 'error');
     }
   };
 
   const goToResults = () => {
     navigate('/results', { 
       state: { 
-        logs, 
+        faceRecognitionLogs, 
+        voiceCommandLogs,
         emotions: currentEmotions 
       } 
     });
@@ -122,31 +141,31 @@ function Capture() {
   // 🔧 FUNCIÓN DE PRUEBA - Llama directamente al API sin voz
   const testCommand = async (commandName) => {
     const testCommands = {
-      bitcoin: { task: 'bitcoin', text: 'bitcoin', params: {} },
-      movie: { task: 'movie', text: 'película matrix', params: { title: 'matrix' } },
+      bitcoin: { task: 'bitcoin', text: 'bitcoin 7', params: { days: 7 } },
+      movie: { task: 'movie', text: 'película', params: {} },
       car: { task: 'car', text: 'coche 2020 50000', params: { year: 2020, km: 50000 } },
-      bmi: { task: 'bmi', text: 'imc 180 75 30', params: { height: 180, weight: 75, age: 30 } },
+      bmi: { task: 'bmi', text: 'imc 1.75 75 30', params: { height: 1.75, weight: 75, age: 30 } },
       london: { task: 'london', text: 'londres viernes', params: { day: 'viernes' } }
     };
 
     const command = testCommands[commandName];
-    addLog(`🧪 TEST: Enviando comando ${commandName}`, 'info');
+    addVoiceLog(`🧪 Enviando comando de prueba: ${commandName}`, 'info');
     
     try {
       console.log('🧪 TEST - Enviando:', command);
       const response = await apiClient.processCommand(command);
       console.log('🧪 TEST - Respuesta:', response);
-      addLog(`✅ TEST OK: ${response}`, 'success');
+      addVoiceLog(`✅ ${response}`, 'success');
     } catch (error) {
       console.error('🧪 TEST - Error:', error);
-      addLog(`❌ TEST ERROR: ${error.message}`, 'error');
+      addVoiceLog(`❌ Error en prueba: ${error.message}`, 'error');
     }
   };
 
   return (
     <div className="capture-page">
       <div className="capture-header">
-        <h1>🤖 TravisTEC - Sistemas Inteligentes</h1>
+        <h1>JarvisTEC - Sistemas Inteligentes</h1>
         <p>Controla cada sistema de forma independiente</p>
       </div>
 
@@ -190,6 +209,24 @@ function Capture() {
             <EmotionDisplay emotions={currentEmotions} />
           </div>
         </div>
+
+        {/* LOG DE RECONOCIMIENTO FACIAL - DEBAJO DE LA CÁMARA */}
+        <div className="logs-section-inline facial-logs-inline">
+          <h3>📋 Registro de Actividad</h3>
+          <div className="logs-container">
+            {faceRecognitionLogs.length === 0 ? (
+              <p className="no-logs">No hay actividad de reconocimiento facial. Activa la cámara para comenzar.</p>
+            ) : (
+              faceRecognitionLogs.map(log => (
+                <div key={log.id} className={`log-entry ${log.type}`}>
+                  <span className="timestamp">[{log.timestamp}]</span>
+                  <span className="log-icon">📸</span>
+                  <span className="message">{log.message}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
 
       {/* SEPARADOR */}
@@ -221,39 +258,23 @@ function Capture() {
               onTranscription={handleTranscription}
               onCommand={handleCommand}
             />
-            
-            <div className="commands-help">
-              <h3>Comandos Disponibles:</h3>
-              <ul>
-                <li>"TravisTEC bitcoin" - Precio de Bitcoin</li>
-                <li>"TravisTEC película matrix" - Recomendaciones</li>
-                <li>"TravisTEC imc 180 75 30" - Cálculo IMC</li>
-                <li>"TravisTEC Londres viernes" - Crímenes</li>
-                <li>+ 6 comandos más...</li>
-              </ul>
-            </div>
+          </div>
 
-            {/* 🔧 PANEL DE PRUEBAS */}
-            <div className="test-panel">
-              <h3>🧪 Pruebas sin Micrófono</h3>
-              <p>Haz clic para probar la conexión directamente:</p>
-              <div className="test-buttons">
-                <button onClick={() => testCommand('bitcoin')} className="btn-test">
-                  💰 Bitcoin
-                </button>
-                <button onClick={() => testCommand('movie')} className="btn-test">
-                  🎬 Película
-                </button>
-                <button onClick={() => testCommand('car')} className="btn-test">
-                  🚗 Auto
-                </button>
-                <button onClick={() => testCommand('bmi')} className="btn-test">
-                  💪 IMC
-                </button>
-                <button onClick={() => testCommand('london')} className="btn-test">
-                  🇬🇧 Londres
-                </button>
-              </div>
+          {/* LOG DE COMANDOS DE VOZ - AL LADO DEL MICRÓFONO */}
+          <div className="logs-section-inline voice-logs-inline">
+            <h3>📋 Registro de Actividad</h3>
+            <div className="logs-container">
+              {voiceCommandLogs.length === 0 ? (
+                <p className="no-logs">No hay actividad de comandos de voz. Activa el micrófono para comenzar.</p>
+              ) : (
+                voiceCommandLogs.map(log => (
+                  <div key={log.id} className={`log-entry ${log.type}`}>
+                    <span className="timestamp">[{log.timestamp}]</span>
+                    <span className="log-icon">🎤</span>
+                    <span className="message">{log.message}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -264,23 +285,6 @@ function Capture() {
         <button onClick={goToResults} className="btn btn-secondary btn-large">
           📊 Ver Estadísticas y Resultados
         </button>
-      </div>
-
-      {/* LOGS COMPARTIDOS */}
-      <div className="logs-section">
-        <h2>📋 Registro de Actividad (Ambos Sistemas)</h2>
-        <div className="logs-container">
-          {logs.length === 0 ? (
-            <p className="no-logs">No hay actividad aún. Activa algún sistema para comenzar.</p>
-          ) : (
-            logs.map(log => (
-              <div key={log.id} className={`log-entry ${log.type}`}>
-                <span className="timestamp">[{log.timestamp}]</span>
-                <span className="message">{log.message}</span>
-              </div>
-            ))
-          )}
-        </div>
       </div>
     </div>
   );
