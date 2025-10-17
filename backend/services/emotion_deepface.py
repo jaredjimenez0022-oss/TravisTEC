@@ -12,6 +12,7 @@ from typing import Any, Dict, List
 
 # Improve DeepFace compatibility with TF / Keras 3 environments
 os.environ.setdefault("TF_USE_LEGACY_KERAS", "1")
+os.environ.setdefault("KERAS_BACKEND", "tensorflow")
 # Quiet TensorFlow C++ logs (optional)
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 import cv2

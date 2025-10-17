@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CameraCapture from '../components/CameraCapture';
 import AudioRecorder from '../components/AudioRecorder';
@@ -17,7 +17,41 @@ function Capture() {
   const [voiceCommandLogs, setVoiceCommandLogs] = useState([]); // 🎤 Logs de comandos de voz
   
   const [snapshotPreview, setSnapshotPreview] = useState(null);
+  // Metadatos
+  const [movieGenres, setMovieGenres] = useState([]);
+  const [movieYears, setMovieYears] = useState([]);
+  const [airOrigins, setAirOrigins] = useState([]);
+  const [airDestinations, setAirDestinations] = useState([]);
+  const [airCarriers, setAirCarriers] = useState([]);
+  // Prompt para completar parámetros faltantes
+  const [pendingCommand, setPendingCommand] = useState(null);
+  const [promptValues, setPromptValues] = useState({});
   const navigate = useNavigate();
+
+  // Cargar metadatos al montar
+  useEffect(() => {
+    const loadMeta = async () => {
+      try {
+        const movies = await apiClient.getMovieMeta();
+        setMovieGenres(movies.genres || []);
+        setMovieYears(movies.years || []);
+        addVoiceLog('🎬 Metadatos de películas cargados', 'info');
+      } catch (e) {
+        addVoiceLog('⚠️ No se pudieron cargar géneros/años de películas', 'warning');
+      }
+      try {
+        const air = await apiClient.getAirlineMeta();
+        setAirOrigins(air.origins || []);
+        setAirDestinations(air.destinations || []);
+        setAirCarriers(air.carriers || []);
+        addVoiceLog('🛫 Metadatos de aerolíneas cargados', 'info');
+      } catch (e) {
+        addVoiceLog('⚠️ No se pudieron cargar orígenes/destinos/aerolíneas', 'warning');
+      }
+    };
+    loadMeta();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Función para agregar log al sistema de RECONOCIMIENTO FACIAL
   const addFaceLog = (message, type = 'info') => {
@@ -140,14 +174,75 @@ function Capture() {
     try {
       console.log('🎯 handleCommand llamado con:', command);
       addVoiceLog(`🎯 Comando parseado: ${command.task || 'desconocido'}`, 'info');
-      
+      // Si el parser indicó que faltan parámetros, abrir prompt
+      const needs = command?.params?.needs || [];
+      if (needs.length) {
+        setPendingCommand(command);
+        const init = {};
+        if (command.task === 'movie') {
+          init.genre = command.params.genre || (movieGenres[0] || '');
+          init.year = command.params.year || (movieYears[movieYears.length - 1] || '');
+        } else if (command.task === 'airline') {
+          init.origin = command.params.origin || (airOrigins[0] || '');
+          init.dest = command.params.dest || (airDestinations[0] || '');
+          init.carrier = command.params.carrier || (airCarriers[0] || '');
+          init.month = command.params.month || new Date().getMonth() + 1;
+          init.day = command.params.day || new Date().getDate();
+          init.distance = command.params.distance || 500;
+        } else if (command.task === 'london' || command.task === 'chicago') {
+          init.month = command.params.month || new Date().getMonth() + 1;
+          init.date = command.params.date || new Date().getDate();
+          init.day = command.params.day || 'viernes';
+        }
+        setPromptValues(init);
+        addVoiceLog('ℹ️ Falta información. Completa el formulario y confirma.', 'info');
+        return;
+      }
+
       const response = await apiClient.processCommand(command);
       console.log('✅ Respuesta del servidor:', response);
-      
       addVoiceLog(`✅ ${response}`, 'success');
     } catch (error) {
       console.error('❌ Error procesando comando:', error);
       addVoiceLog(`❌ Error: ${error.message}`, 'error');
+    }
+  };
+
+  const cancelPrompt = () => {
+    setPendingCommand(null);
+    setPromptValues({});
+  };
+
+  const confirmPrompt = async () => {
+    if (!pendingCommand) return;
+    const pc = JSON.parse(JSON.stringify(pendingCommand));
+    if (pc.task === 'movie') {
+      if (promptValues.genre) pc.params.genre = promptValues.genre;
+      if (promptValues.year) pc.params.year = parseInt(promptValues.year, 10);
+    } else if (pc.task === 'airline') {
+      if (promptValues.origin) pc.params.origin = promptValues.origin;
+      if (promptValues.dest) pc.params.dest = promptValues.dest;
+      if (promptValues.carrier) pc.params.carrier = promptValues.carrier;
+      if (promptValues.month) pc.params.month = parseInt(promptValues.month, 10);
+      if (promptValues.day) pc.params.day = parseInt(promptValues.day, 10);
+      if (promptValues.distance) pc.params.distance = parseInt(promptValues.distance, 10);
+    } else if (pc.task === 'london' || pc.task === 'chicago') {
+      if (promptValues.month) pc.params.month = parseInt(promptValues.month, 10);
+      if (promptValues.date) pc.params.date = parseInt(promptValues.date, 10);
+      if (promptValues.day) pc.params.day = promptValues.day;
+    }
+
+    delete pc.params.needs;
+
+    try {
+      addVoiceLog('⏩ Enviando comando con parámetros completados…', 'info');
+      const response = await apiClient.processCommand(pc);
+      addVoiceLog(`✅ ${response}`, 'success');
+    } catch (e) {
+      addVoiceLog(`❌ Error: ${e.message}`, 'error');
+    } finally {
+      setPendingCommand(null);
+      setPromptValues({});
     }
   };
 
@@ -281,6 +376,115 @@ function Capture() {
               onTranscription={handleTranscription}
               onCommand={handleCommand}
             />
+            {pendingCommand && (
+              <div className="param-prompt">
+                <h4>Completa los datos para “{pendingCommand.task}”</h4>
+                {pendingCommand.task === 'movie' && (
+                  <div className="prompt-form">
+                    <div className="row">
+                      <label>Género</label>
+                      <select value={promptValues.genre || ''} onChange={e => setPromptValues(v => ({...v, genre: e.target.value}))}>
+                        <option value="">-- Selecciona --</option>
+                        {movieGenres.map(g => (<option key={g} value={g}>{g}</option>))}
+                      </select>
+                    </div>
+                    <div className="row">
+                      <label>Año</label>
+                      <select value={promptValues.year || ''} onChange={e => setPromptValues(v => ({...v, year: e.target.value}))}>
+                        <option value="">-- Selecciona --</option>
+                        {movieYears.map(y => (<option key={y} value={y}>{y}</option>))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+                {pendingCommand.task === 'airline' && (
+                  <div className="prompt-form">
+                    <div className="row">
+                      <label>Origen</label>
+                      <select value={promptValues.origin || ''} onChange={e => setPromptValues(v => ({...v, origin: e.target.value}))}>
+                        <option value="">-- Selecciona --</option>
+                        {airOrigins.map(c => (<option key={c} value={c}>{c}</option>))}
+                      </select>
+                    </div>
+                    <div className="row">
+                      <label>Destino</label>
+                      <select value={promptValues.dest || ''} onChange={e => setPromptValues(v => ({...v, dest: e.target.value}))}>
+                        <option value="">-- Selecciona --</option>
+                        {airDestinations.map(c => (<option key={c} value={c}>{c}</option>))}
+                      </select>
+                    </div>
+                    <div className="row">
+                      <label>Aerolínea</label>
+                      <select value={promptValues.carrier || ''} onChange={e => setPromptValues(v => ({...v, carrier: e.target.value}))}>
+                        <option value="">(opcional)</option>
+                        {airCarriers.map(c => (<option key={c} value={c}>{c}</option>))}
+                      </select>
+                    </div>
+                    <div className="row trio">
+                      <div>
+                        <label>Mes</label>
+                        <select value={promptValues.month || ''} onChange={e => setPromptValues(v => ({...v, month: e.target.value}))}>
+                          {[...Array(12)].map((_, i) => (<option key={i+1} value={i+1}>{i+1}</option>))}
+                        </select>
+                      </div>
+                      <div>
+                        <label>Día</label>
+                        <input type="number" min="1" max="31" value={promptValues.day || ''} onChange={e => setPromptValues(v => ({...v, day: e.target.value}))} />
+                      </div>
+                      <div>
+                        <label>Distancia (mi)</label>
+                        <input type="number" min="50" max="5000" step="10" value={promptValues.distance || ''} onChange={e => setPromptValues(v => ({...v, distance: e.target.value}))} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {(pendingCommand.task === 'london' || pendingCommand.task === 'chicago') && (
+                  <div className="prompt-form">
+                    <div className="row trio">
+                      <div>
+                        <label>Mes</label>
+                        <select value={promptValues.month || ''} onChange={e => setPromptValues(v => ({...v, month: e.target.value}))}>
+                          {[...Array(12)].map((_, i) => (<option key={i+1} value={i+1}>{i+1}</option>))}
+                        </select>
+                      </div>
+                      <div>
+                        <label>Día del mes</label>
+                        <input type="number" min="1" max="31" value={promptValues.date || ''} onChange={e => setPromptValues(v => ({...v, date: e.target.value}))} />
+                      </div>
+                      <div>
+                        <label>Día de semana</label>
+                        <select value={promptValues.day || 'viernes'} onChange={e => setPromptValues(v => ({...v, day: e.target.value}))}>
+                          {['lunes','martes','miercoles','miércoles','jueves','viernes','sabado','sábado','domingo'].map(d => (<option key={d} value={d}>{d}</option>))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="prompt-actions">
+                  <button className="btn" onClick={confirmPrompt}>Aceptar</button>
+                  <button className="btn btn-secondary" onClick={cancelPrompt}>Cancelar</button>
+                </div>
+              </div>
+            )}
+            {/* Metadatos mínimos visibles para el usuario */}
+            <div className="meta-hints">
+              <h4>Datos disponibles</h4>
+              <div className="meta-row">
+                <strong>Géneros:</strong> {movieGenres.slice(0, 8).join(', ')}{movieGenres.length > 8 ? '…' : ''}
+              </div>
+              <div className="meta-row">
+                <strong>Años:</strong> {movieYears.slice(0, 10).join(', ')}{movieYears.length > 10 ? '…' : ''}
+              </div>
+              <div className="meta-row">
+                <strong>Orígenes:</strong> {airOrigins.slice(0, 10).join(', ')}{airOrigins.length > 10 ? '…' : ''}
+              </div>
+              <div className="meta-row">
+                <strong>Destinos:</strong> {airDestinations.slice(0, 10).join(', ')}{airDestinations.length > 10 ? '…' : ''}
+              </div>
+              <div className="meta-row">
+                <strong>Aerolíneas:</strong> {airCarriers.slice(0, 10).join(', ')}{airCarriers.length > 10 ? '…' : ''}
+              </div>
+            </div>
           </div>
 
           {/* LOG DE COMANDOS DE VOZ - AL LADO DEL MICRÓFONO */}

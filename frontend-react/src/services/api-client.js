@@ -117,6 +117,34 @@ class APIClient {
             throw new Error('Sistema no disponible');
         }
     }
+
+    /**
+     * Obtiene metadatos de películas (géneros y años disponibles)
+     * @returns {Promise<{genres: string[], years: number[]}>}
+     */
+    async getMovieMeta() {
+        try {
+            const response = await this.client.get('/api/v1/meta/movies');
+            return response.data;
+        } catch (error) {
+            console.error('Error obteniendo metadatos de películas:', error);
+            throw new Error(error.response?.data?.detail || 'Error obteniendo metadatos de películas');
+        }
+    }
+
+    /**
+     * Obtiene metadatos de aerolíneas (orígenes, destinos, aerolíneas)
+     * @returns {Promise<{origins: string[], destinations: string[], carriers: string[]}>}
+     */
+    async getAirlineMeta() {
+        try {
+            const response = await this.client.get('/api/v1/meta/airports');
+            return response.data;
+        } catch (error) {
+            console.error('Error obteniendo metadatos de aeropuertos:', error);
+            throw new Error(error.response?.data?.detail || 'Error obteniendo metadatos de aeropuertos');
+        }
+    }
 }
 
 // Exportar instancia única del cliente

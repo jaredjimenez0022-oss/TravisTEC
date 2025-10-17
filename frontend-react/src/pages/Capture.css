@@ -203,6 +203,55 @@
   font-size: 1.3rem;
 }
 
+/* Prompt UI for missing parameters */
+.param-prompt {
+  margin-top: 1rem;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  border-radius: 12px;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+.param-prompt h4 {
+  margin: 0 0 0.75rem 0;
+  color: #e2e8f0;
+}
+.prompt-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.prompt-form .row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+.prompt-form .row.trio {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.prompt-form label {
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  min-width: 110px;
+}
+.prompt-form select,
+.prompt-form input[type="number"],
+.prompt-form input[type="text"] {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  border: 1px solid rgba(100, 116, 139, 0.4);
+  border-radius: 8px;
+}
+.prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
 /* LOGS INLINE - AL LADO DE CADA SISTEMA */
 .logs-section-inline {
   background: rgba(255, 255, 255, 0.05);

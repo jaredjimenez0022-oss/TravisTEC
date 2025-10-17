@@ -5,6 +5,7 @@ import './AudioRecorder.css';
 function AudioRecorder({ onTranscription, onCommand, isActive }) {
   const [isRecording, setIsRecording] = useState(false);
   const [useWebSpeech, setUseWebSpeech] = useState(false);
+  const [interimText, setInterimText] = useState('');
   const mediaRecorderRef = useRef(null);
   const recognitionRef = useRef(null);
   const streamRef = useRef(null);
@@ -54,24 +55,27 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = 'es-ES';
-      recognition.interimResults = false;
+      recognition.interimResults = true; // enable live partials
       recognition.continuous = true;
 
       recognition.onresult = (event) => {
-        const last = event.results[event.results.length - 1];
-        if (last.isFinal) {
-          const text = last[0].transcript.trim();
-          console.log('Reconocido:', text);
-          
-          if (onTranscription) {
-            onTranscription(text);
+        let finalTranscript = '';
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript + ' ';
           }
-
-          // Parsear comando si tiene palabra clave
+        }
+        if (interimTranscript) setInterimText(interimTranscript.trim());
+        if (finalTranscript) {
+          const text = finalTranscript.trim();
+          setInterimText('');
+          if (onTranscription) onTranscription(text);
           const parsed = parseCommand(text);
-          if (parsed && onCommand) {
-            onCommand(parsed);
-          }
+          if (parsed && onCommand) onCommand(parsed);
         }
       };
 
@@ -175,14 +179,44 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
       }
     }
 
-    // 2) Película - más flexible (acepta plural y singular)
+    // 2) Película - extrae género y año si están presentes
     else if (payloadText.match(/\b(pel[ií]culas?|movies?|recomienda|recomendaci[óo]n|film|films)\b/i)) {
       task = 'movie';
-      // Extraer título después de "pelicula"
-      const match = payloadText.match(/pel[íi]culas?\s+(.+)/);
-      if (match) {
-        params.title = match[1].trim();
+      // posibles géneros comunes (ES e inglés)
+      const genreMap = {
+        'accion': 'Action','acción': 'Action','action': 'Action',
+        'comedia': 'Comedy','comedy': 'Comedy',
+        'drama': 'Drama',
+        'romance': 'Romance','romantic': 'Romance',
+        'terror': 'Horror','horror': 'Horror',
+        'thriller': 'Thriller','suspenso': 'Thriller',
+        'animacion': 'Animation','animación': 'Animation','animation': 'Animation',
+        'aventura': 'Adventure','adventure': 'Adventure',
+        'crimen': 'Crime','crime': 'Crime',
+        'documental': 'Documentary','documentary': 'Documentary',
+        'familia': 'Family','family': 'Family',
+        'fantasia': 'Fantasy','fantasía': 'Fantasy','fantasy': 'Fantasy',
+        'misterio': 'Mystery','mystery': 'Mystery',
+        'musical': 'Music','music': 'Music',
+        'ciencia ficcion': 'Science Fiction','ciencia ficción': 'Science Fiction','scifi': 'Science Fiction','science fiction': 'Science Fiction',
+        'guerra': 'War','war': 'War',
+        'historia': 'History','history': 'History',
+        'western': 'Western'
+      };
+      const yearMatch = payloadText.match(/(19\d{2}|20\d{2})/);
+      if (yearMatch) {
+        const yearNum = parseInt(yearMatch[1], 10);
+        if (yearNum >= 1900 && yearNum <= 2035) params.year = yearNum;
       }
+      // buscar palabra de género
+      const gKeys = Object.keys(genreMap);
+      const found = gKeys.find(g => payloadText.includes(g));
+      if (found) params.genre = genreMap[found];
+      // si faltan parámetros, solicitarlos
+      const needs = [];
+      if (!params.genre) needs.push('genre');
+      if (!params.year) needs.push('year');
+      if (needs.length) params.needs = needs;
     }
 
     // 3) Automóvil - más variaciones (acepta plurales y "teccar")
@@ -222,24 +256,45 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
       }
     }
 
-    // 7) Londres - más flexible
+    // 7) Londres - acepta mes (nombre) y día del mes
     else if (payloadText.match(/\b(londres|london)\b/i)) {
       task = 'london';
       const days = ['lunes', 'martes', 'miercoles', 'miércoles', 'jueves', 'viernes', 'sabado', 'sábado', 'domingo'];
       const foundDay = days.find(d => payloadText.includes(d));
-      if (foundDay) {
-        params.day = foundDay;
-      }
+      if (foundDay) params.day = foundDay;
+      const months = {
+        'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,
+        'julio':7,'agosto':8,'septiembre':9,'octubre':10,'noviembre':11,'diciembre':12
+      };
+      const mName = Object.keys(months).find(m => payloadText.includes(m));
+      if (mName) params.month = months[mName];
+      // día del mes (número después del mes)
+      const domMatch = payloadText.match(new RegExp(`${mName ?? ''}[^\d]*(\d{1,2})`));
+      if (domMatch) params.date = parseInt(domMatch[1], 10);
+      const needs = [];
+      if (!params.month) needs.push('month');
+      if (!params.date) needs.push('day');
+      if (needs.length) params.needs = needs;
     }
 
-    // 8) Chicago - más flexible
+    // 8) Chicago - acepta mes (nombre) y día del mes
     else if (payloadText.match(/\b(chicago)\b/i)) {
       task = 'chicago';
       const days = ['lunes', 'martes', 'miercoles', 'miércoles', 'jueves', 'viernes', 'sabado', 'sábado', 'domingo'];
       const foundDay = days.find(d => payloadText.includes(d));
-      if (foundDay) {
-        params.day = foundDay;
-      }
+      if (foundDay) params.day = foundDay;
+      const months = {
+        'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,
+        'julio':7,'agosto':8,'septiembre':9,'octubre':10,'noviembre':11,'diciembre':12
+      };
+      const mName = Object.keys(months).find(m => payloadText.includes(m));
+      if (mName) params.month = months[mName];
+      const domMatch = payloadText.match(new RegExp(`${mName ?? ''}[^\d]*(\d{1,2})`));
+      if (domMatch) params.date = parseInt(domMatch[1], 10);
+      const needs = [];
+      if (!params.month) needs.push('month');
+      if (!params.date) needs.push('day');
+      if (needs.length) params.needs = needs;
     }
 
     // 9) Cirrosis - más flexible (acepta plurales)
@@ -254,7 +309,7 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
       }
     }
 
-    // 10) Avión - más flexible (acepta plurales)
+    // 10) Avión - acepta origen, destino (IATA 3 letras) y aerolínea
     else if (payloadText.match(/\b(aviones?|vuelos?|flights?|aerol[íi]neas?)\b/i)) {
       task = 'airline';
       // Extraer mes, día y distancia
@@ -277,6 +332,25 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
       if (foundMonth) {
         params.month = months[foundMonth];
       }
+
+      // Origen/destino IATA: buscar 3 letras después de palabras clave
+      const iataMatchOrigin = payloadText.match(/(origen|desde)\s+([a-z]{3})/i);
+      const iataMatchDest = payloadText.match(/(destino|hacia|a)\s+([a-z]{3})/i);
+      if (iataMatchOrigin) params.origin = iataMatchOrigin[2].toUpperCase();
+      if (iataMatchDest) params.dest = iataMatchDest[2].toUpperCase();
+
+      // Aerolínea por nombre -> código aproximado
+      const carrierMap = {
+        'delta': 'DL', 'american': 'AA', 'americana': 'AA', 'united': 'UA',
+        'jetblue': 'B6', 'spirit': 'NK', 'southwest': 'WN', 'alaska': 'AS'
+      };
+      const carrKey = Object.keys(carrierMap).find(k => payloadText.includes(k));
+      if (carrKey) params.carrier = carrierMap[carrKey];
+
+      const needs = [];
+      if (!params.origin) needs.push('origin');
+      if (!params.dest) needs.push('dest');
+      if (needs.length) params.needs = needs;
     }
 
     return {
@@ -296,6 +370,29 @@ function AudioRecorder({ onTranscription, onCommand, isActive }) {
             : '🎤 Micrófono inactivo'
           }
         </span>
+      </div>
+      {/* Live interim transcription */}
+      {useWebSpeech && isRecording && (
+        <div className="interim-text">
+          <strong>Escuchando…</strong>
+          <div className="bubble">{interimText || 'Empieza a hablar'}</div>
+        </div>
+      )}
+
+      {/* Available voice commands */}
+      <div className="commands-help">
+        <h4>Comandos disponibles</h4>
+        <ul>
+          <li>“Travis TEC bitcoin 7 días”</li>
+          <li>“Travis TEC película acción 2012”</li>
+          <li>“Travis TEC coche 2020 50000”</li>
+          <li>“Travis TEC IMC 1.75 75 30”</li>
+          <li>“Travis TEC Londres agosto 23 viernes”</li>
+          <li>“Travis TEC Chicago agosto 23 martes”</li>
+          <li>“Travis TEC aguacate 5 días”</li>
+          <li>“Travis TEC avión junio 10 300 origen MIA destino JFK aerolínea Delta”</li>
+        </ul>
+        <p>Tip: Di “Travis TEC …” para activar el comando.</p>
       </div>
     </div>
   );

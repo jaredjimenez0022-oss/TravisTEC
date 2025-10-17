@@ -476,13 +476,12 @@ class ModelRunner:
                         unit_multiplier = float(os.getenv('CAR_PRICE_UNIT_MULTIPLIER', '100000'))
                         rupees = price_val * unit_multiplier
 
-                        usd_rate = os.getenv('CAR_PRICE_TO_USD_RATE')
+                        usd_rate = os.getenv('CAR_PRICE_TO_USD_RATE', '0.012')
                         usd = None
-                        if usd_rate:
-                            try:
-                                usd = rupees * float(usd_rate)
-                            except Exception:
-                                usd = None
+                        try:
+                            usd = rupees * float(usd_rate)
+                        except Exception:
+                            usd = None
 
                         resp.update({
                             "price_dataset_units": price_val,

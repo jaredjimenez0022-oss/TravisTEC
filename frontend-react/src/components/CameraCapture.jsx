@@ -8,6 +8,7 @@ function CameraCapture({ onSnapshot, onEmotionDetected, isActive }) {
   const [stream, setStream] = useState(null);
   // Removed auto-capture interval to analyze only on manual snapshot
   const [captureInterval, setCaptureInterval] = useState(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     if (isActive) {
@@ -30,6 +31,12 @@ function CameraCapture({ onSnapshot, onEmotionDetected, isActive }) {
       
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        // Wait for metadata/canplay to ensure dimensions are set
+        const v = videoRef.current;
+        const onReady = () => setIsReady(true);
+        v.addEventListener('loadedmetadata', onReady, { once: true });
+        v.addEventListener('canplay', onReady, { once: true });
+        try { v.play(); } catch {}
       }
       
       setStream(mediaStream);
@@ -47,6 +54,7 @@ function CameraCapture({ onSnapshot, onEmotionDetected, isActive }) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
+    setIsReady(false);
 
     // No periodic capture to clear
   };
@@ -55,9 +63,14 @@ function CameraCapture({ onSnapshot, onEmotionDetected, isActive }) {
 
   const takeManualSnapshot = () => {
     if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    // If video not ready yet, avoid capturing a black frame
+    if (!isReady || (video.videoWidth || 0) < 2 || (video.videoHeight || 0) < 2) {
+      console.warn('Snapshot attempted before camera ready');
+      return;
+    }
 
     const canvas = canvasRef.current;
-    const video = videoRef.current;
     
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
@@ -99,8 +112,9 @@ function CameraCapture({ onSnapshot, onEmotionDetected, isActive }) {
         <button 
           onClick={takeManualSnapshot}
           className="snapshot-btn"
+          disabled={!isReady}
         >
-          📸 Tomar Foto
+          {isReady ? '📸 Tomar Foto' : '⏳ Preparando cámara…'}
         </button>
       )}
     </div>

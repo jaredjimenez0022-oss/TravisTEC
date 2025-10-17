@@ -61,7 +61,8 @@ class STTService:
     def setup_whisper(self):
         """Configurar OpenAI Whisper (local)"""
         try:
-            import whisper
+            import importlib
+            whisper = importlib.import_module('whisper')
             
             model_size = os.getenv("WHISPER_MODEL_SIZE", "base")
             self.model = whisper.load_model(model_size)

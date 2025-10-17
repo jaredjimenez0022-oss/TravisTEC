@@ -14,6 +14,7 @@ from pathlib import Path
 import random
 import numpy as np
 from fastapi import Request
+from typing import List, Dict, Any
 
 app = FastAPI(title="Jarvis TEC API")
 
@@ -45,6 +46,7 @@ async def root():
     return {"message": "Jarvis TEC API - Running"}
 
 @app.post("/api/transcribe")
+@app.post("/api/v1/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
     """
     Transcribe audio a texto usando STT (Speech-to-Text)
@@ -132,13 +134,24 @@ async def execute_command(payload: dict):
         print(f"[MODELS] Disponibles: {models}")
         
         if task == 'movie':
-            # Ejecutar recomendador de películas - UNA película aleatoria
+            # Recomendador de películas (acepta género y año)
             try:
-                result = model_runner.predict("movie_recommender", params={"top_k": 1})
+                genre = params.get('genre')
+                year = params.get('year')
+                result = model_runner.predict("movie_recommender", params={"top_k": 1, "genre": genre, "year": year})
                 if 'prediction' in result:
                     movies = result['prediction']
                     if isinstance(movies, list) and len(movies) > 0:
                         response_text = f"🎬 Te recomiendo: {movies[0]}"
+                        if genre or year:
+                            response_text += " ("
+                            if genre:
+                                response_text += f"género {genre}"
+                            if genre and year:
+                                response_text += ", "
+                            if year:
+                                response_text += f"año {year}"
+                            response_text += ")"
                     else:
                         response_text = f"🎬 Recomendación: {movies}"
                 else:
@@ -327,22 +340,60 @@ async def execute_command(payload: dict):
                 response_text = f"🥑 Error: {str(e)}"
         
         elif task == 'london':
-            # Predicción crimen Londres
+            # Predicción crimen Londres (acepta mes y día del mes)
             try:
                 day = params.get('day', 'viernes')
-                result = model_runner.predict("london_crime_model", params={"day_of_week": day})
+                month = params.get('month')
+                # month opcional, mapea si es string
+                if isinstance(month, str):
+                    months = {
+                        'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,
+                        'julio':7,'agosto':8,'septiembre':9,'octubre':10,'noviembre':11,'diciembre':12
+                    }
+                    ml = month.strip().lower()
+                    month = months.get(ml, None)
+                params_lr = {"day_of_week": day}
+                if month is not None:
+                    params_lr["month"] = int(month)
+                result = model_runner.predict("london_crime_model", params=params_lr)
                 crime = result.get('prediction', [0])[0]
-                response_text = f"🇬🇧 Crímenes estimados en Londres ({day}): {crime:.0f} incidentes"
+                # Día del mes solo informativo si lo pasan (no usado por el modelo):
+                dom = params.get('date') or params.get('day_of_month')
+                date_str = ""
+                if month is not None:
+                    date_str = f" (mes {int(month)}"
+                    if dom is not None:
+                        date_str += f", día {dom}"
+                    date_str += ")"
+                response_text = f"🇬🇧 Crímenes estimados en Londres ({day}){date_str}: {crime:.0f} incidentes"
             except Exception as e:
                 response_text = f"🇬🇧 Error: {str(e)}"
         
         elif task == 'chicago':
-            # Predicción crimen Chicago
+            # Predicción crimen Chicago (acepta mes y día del mes)
             try:
                 day = params.get('day', 'viernes')
-                result = model_runner.predict("chicago_crime", params={"day_of_week": day})
+                month = params.get('month')
+                if isinstance(month, str):
+                    months = {
+                        'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,
+                        'julio':7,'agosto':8,'septiembre':9,'octubre':10,'noviembre':11,'diciembre':12
+                    }
+                    ml = month.strip().lower()
+                    month = months.get(ml, None)
+                params_cc = {"day_of_week": day}
+                if month is not None:
+                    params_cc["month"] = int(month)
+                result = model_runner.predict("chicago_crime", params=params_cc)
                 crime = result.get('prediction', [0])[0]
-                response_text = f"🇺🇸 Crímenes estimados en Chicago ({day}): {crime:.0f} incidentes"
+                dom = params.get('date') or params.get('day_of_month')
+                date_str = ""
+                if month is not None:
+                    date_str = f" (mes {int(month)}"
+                    if dom is not None:
+                        date_str += f", día {dom}"
+                    date_str += ")"
+                response_text = f"🇺🇸 Crímenes estimados en Chicago ({day}){date_str}: {crime:.0f} incidentes"
             except Exception as e:
                 response_text = f"🇺🇸 Error: {str(e)}"
         
@@ -362,15 +413,80 @@ async def execute_command(payload: dict):
                 response_text = f"🏥 Error: {str(e)}"
         
         elif task == 'airline':
-            # Predicción delay de vuelos
+            # Predicción delay de vuelos (acepta origen, destino, aerolínea, mes, día, distancia)
             try:
-                month = params.get('month', 6)  # Mes del vuelo (1-12)
-                day = params.get('day', 15)  # Día del mes
-                distance = params.get('distance', 500)  # Distancia en millas
-                result = model_runner.predict("airline_delay_model", params={"month": month, "day": day, "distance": distance})
-                pred_class = result.get('prediction', [0])[0]
-                status = "Con retraso ⏰" if int(pred_class) == 1 else "A tiempo ✈️"
-                response_text = f"✈️ Predicción vuelo: {status} (Mes: {month}, Día: {day}, Distancia: {distance} mi)"
+                month = params.get('month', 6)
+                day = params.get('day', 15)
+                distance = params.get('distance', 500)
+                origin = params.get('origin') or params.get('orig')
+                dest = params.get('dest') or params.get('destination')
+                carrier = params.get('carrier') or params.get('unique_carrier')
+
+                # Si hay modelo entrenado, replicar la lógica de predict_airline
+                if 'airline_delay_model' in model_runner.get_available_models():
+                    pkg = model_runner.models.get('airline_delay_model')
+                    model_obj = pkg['model'] if isinstance(pkg, dict) and 'model' in pkg else pkg
+                    encs = pkg.get('encoders', {}) if isinstance(pkg, dict) else {}
+                    # Defaults
+                    params_air = {
+                        'Month': month,
+                        'DayofMonth': day,
+                        'DayOfWeek': params.get('day_of_week', 3),
+                        'CRSDepTime': params.get('crs_dep_time', 1200),
+                        'CRSArrTime': params.get('crs_arr_time', 1400),
+                        'CRSElapsedTime': params.get('crs_elapsed', 120),
+                        'Distance': distance,
+                        'Origin': (origin or 'OTHER'),
+                        'Dest': (dest or 'OTHER'),
+                        'UniqueCarrier': (carrier or 'XX')
+                    }
+
+                    # Encode categorical with saved encoders
+                    try:
+                        origin_le = encs['origin'].transform([params_air['Origin']])[0]
+                    except Exception:
+                        origin_le = encs['origin'].transform(['OTHER'])[0] if 'origin' in encs else 0
+                    try:
+                        dest_le = encs['dest'].transform([params_air['Dest']])[0]
+                    except Exception:
+                        dest_le = encs['dest'].transform(['OTHER'])[0] if 'dest' in encs else 0
+                    try:
+                        carrier_le = encs['carrier'].transform([params_air['UniqueCarrier']])[0]
+                    except Exception:
+                        carrier_le = 0
+
+                    feature_list = [
+                        float(params_air['Month']),
+                        float(params_air['DayofMonth']),
+                        float(params_air['DayOfWeek']),
+                        float(params_air['CRSDepTime']),
+                        float(params_air['CRSArrTime']),
+                        float(params_air['CRSElapsedTime']),
+                        float(params_air['Distance']),
+                        float(origin_le),
+                        float(dest_le),
+                        float(carrier_le)
+                    ]
+
+                    X = np.array(feature_list).reshape(1, -1)
+                    try:
+                        prob = float(model_obj.predict_proba(X)[0,1]) if hasattr(model_obj, 'predict_proba') else None
+                    except Exception:
+                        prob = None
+                    try:
+                        pred = int(model_obj.predict(X)[0])
+                    except Exception:
+                        pred = None
+
+                    status = "Con retraso ⏰" if pred == 1 else ("A tiempo ✈️" if pred == 0 else "Desconocido")
+                    response_text = f"✈️ {status} (Mes: {month}, Día: {day}, Distancia: {distance} mi"
+                    if origin: response_text += f", Origen: {origin}"
+                    if dest: response_text += f", Destino: {dest}"
+                    if carrier: response_text += f", Aerolínea: {carrier}"
+                    if prob is not None: response_text += f", Prob: {prob:.2f}"
+                    response_text += ")"
+                else:
+                    response_text = f"✈️ Predicción simple: Mes {month}, Día {day}, Distancia {distance}"
             except Exception as e:
                 response_text = f"✈️ Error: {str(e)}"
         
@@ -559,6 +675,62 @@ async def predict_avocado(payload: dict):
             'target_date': target_date,
             'raw': res
         }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get('/api/v1/meta/movies')
+async def get_movie_metadata():
+    """Return available movie genres and years from the recommender package if present."""
+    try:
+        pkg = model_runner.models.get('movie_recommender')
+        genres: List[str] = []
+        years: List[int] = []
+        if isinstance(pkg, dict):
+            movies_df = pkg.get('movies')
+            if movies_df is not None:
+                try:
+                    # genres_list column preferred; fallback to parsing genres_str
+                    if 'genres_list' in movies_df.columns:
+                        gset = set()
+                        for gl in movies_df['genres_list']:
+                            try:
+                                for g in (gl or []):
+                                    gset.add(str(g))
+                            except Exception:
+                                pass
+                        genres = sorted(gset)
+                    elif 'genres_str' in movies_df.columns:
+                        from itertools import chain
+                        gset = set(chain.from_iterable([str(s).split('|') for s in movies_df['genres_str'].fillna('')]))
+                        genres = sorted([g for g in gset if g])
+                    if 'year' in movies_df.columns:
+                        years = sorted([int(y) for y in movies_df['year'].dropna().unique().tolist()])
+                except Exception:
+                    pass
+        return {"genres": genres, "years": years}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get('/api/v1/meta/airports')
+async def get_airline_metadata():
+    """Return available airline metadata extracted from the dataset (origins, destinations, carriers)."""
+    try:
+        import pandas as pd
+        ds = Path(__file__).parent / 'datasets' / 'airline' / 'DelayedFlights.csv'
+        origins: List[str] = []
+        dests: List[str] = []
+        carriers: List[str] = []
+        if ds.exists():
+            df = pd.read_csv(ds, usecols=lambda c: c in ('Origin','Dest','UniqueCarrier'), dtype=str)
+            if 'Origin' in df.columns:
+                origins = sorted(df['Origin'].str.upper().dropna().unique().tolist())
+            if 'Dest' in df.columns:
+                dests = sorted(df['Dest'].str.upper().dropna().unique().tolist())
+            if 'UniqueCarrier' in df.columns:
+                carriers = sorted(df['UniqueCarrier'].str.upper().dropna().unique().tolist())
+        return {"origins": origins, "destinations": dests, "carriers": carriers}
     except Exception as e:
         return {"error": str(e)}
 
