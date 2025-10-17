@@ -454,11 +454,46 @@ class ModelRunner:
             try:
                 pred = model_obj.predict(X)
                 out = pred.tolist() if hasattr(pred, "tolist") else pred
+
+                # Build a response dict so we can attach model-specific conversions (eg. car price -> rupees/usd)
+                resp = {"model": model_name, "input": features, "prediction": out}
+
                 # si clasificación y existe predict_proba
                 if hasattr(model_obj, "predict_proba"):
                     proba = model_obj.predict_proba(X)
-                    return {"model": model_name, "input": features, "prediction": out, "proba": proba.tolist()}
-                return {"model": model_name, "input": features, "prediction": out}
+                    resp["proba"] = proba.tolist()
+
+                # For car price models, provide helpful conversions: dataset units -> rupees -> usd
+                try:
+                    if model_name in ("car_price", "car_model"):
+                        # prediction may be list-like
+                        price_val = None
+                        if isinstance(out, (list, tuple)) and len(out) > 0:
+                            price_val = float(out[0])
+                        else:
+                            price_val = float(out)
+
+                        unit_multiplier = float(os.getenv('CAR_PRICE_UNIT_MULTIPLIER', '100000'))
+                        rupees = price_val * unit_multiplier
+
+                        usd_rate = os.getenv('CAR_PRICE_TO_USD_RATE')
+                        usd = None
+                        if usd_rate:
+                            try:
+                                usd = rupees * float(usd_rate)
+                            except Exception:
+                                usd = None
+
+                        resp.update({
+                            "price_dataset_units": price_val,
+                            "price_rupees": rupees,
+                            "price_usd": usd,
+                        })
+                except Exception:
+                    # if conversion fails, ignore and return base response
+                    pass
+
+                return resp
             except Exception as e:
                 raise RuntimeError(f"Error al predecir con {model_name}: {e}")
         # si pasaron params -> intentar mapping

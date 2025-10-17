@@ -250,11 +250,23 @@ async def execute_command(payload: dict):
                         usd = rupees * float(usd_rate)
                     except Exception:
                         usd = None
+                # ModelRunner now attaches conversions; prefer USD if available
+                # result dict: {prediction, price_dataset_units, price_rupees, price_usd}
+                price_dataset = result.get('price_dataset_units') if isinstance(result, dict) else None
+                rupees = result.get('price_rupees') if isinstance(result, dict) else None
+                usd = result.get('price_usd') if isinstance(result, dict) else None
 
-                response_text = f"🚗 Auto {year} con {km:,} km → Precio estimado: {price_val:,.2f} (dataset units)"
-                response_text += f" ≈ ₹{rupees:,.2f}"
+                # Build friendly response preferring USD when present
                 if usd is not None:
-                    response_text += f" ≈ ${usd:,.2f} (converted)"
+                    response_text = f"🚗 Auto {year} con {km:,} km → Precio estimado: ${usd:,.2f} USD"
+                    if rupees is not None:
+                        response_text += f" (≈ ₹{rupees:,.2f})"
+                elif rupees is not None:
+                    response_text = f"🚗 Auto {year} con {km:,} km → Precio estimado: ₹{rupees:,.2f}"
+                    if price_dataset is not None:
+                        response_text += f" (≈ {price_dataset:,.2f} dataset units)"
+                else:
+                    response_text = f"🚗 Auto {year} con {km:,} km → Precio estimado: {price_val:,.2f} (dataset units)"
             except Exception as e:
                 response_text = f"🚗 Error: {str(e)}"
         
@@ -397,7 +409,37 @@ async def predict_car(payload: dict):
         year = payload.get('year', payload.get('y', 2015))
         km = payload.get('km', payload.get('kms', payload.get('mileage', 50000)))
         res = model_runner.predict('car_model', params={'year': year, 'km': km})
-        return res
+        # If ModelRunner returned numeric-only prediction, enrich with conversions here
+        if isinstance(res, dict):
+            # prefer price_usd if present, else price_rupees, else raw prediction
+            return res
+        else:
+            # res may be a list or scalar; attempt to wrap
+            try:
+                pred_val = None
+                if isinstance(res, (list, tuple)) and len(res) > 0:
+                    pred_val = float(res[0])
+                else:
+                    pred_val = float(res)
+                unit_multiplier = float(os.getenv('CAR_PRICE_UNIT_MULTIPLIER', '100000'))
+                rupees = pred_val * unit_multiplier
+                usd = None
+                usd_rate = os.getenv('CAR_PRICE_TO_USD_RATE')
+                if usd_rate:
+                    try:
+                        usd = rupees * float(usd_rate)
+                    except Exception:
+                        usd = None
+                return {
+                    'model': 'car_price',
+                    'input': {'year': year, 'km': km},
+                    'prediction': [pred_val],
+                    'price_dataset_units': pred_val,
+                    'price_rupees': rupees,
+                    'price_usd': usd
+                }
+            except Exception:
+                return res
     except Exception as e:
         return {"error": str(e)}
 
