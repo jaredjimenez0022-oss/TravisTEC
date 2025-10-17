@@ -79,17 +79,40 @@ function Capture() {
     try {
       const faceData = await apiClient.recognizeFace(imageBlob);
       
-      if (faceData.attributes && faceData.attributes.emotion) {
-        setCurrentEmotions(faceData.attributes.emotion);
-        addFaceLog(`😊 Emoción detectada: ${faceData.dominant_emotion || 'N/A'}`, 'success');
-      } else if (faceData.dominant_emotion) {
-        // Formato simple del mock
-        const emotions = faceData.details || { [faceData.dominant_emotion]: 0.8 };
-        setCurrentEmotions(emotions);
-        addFaceLog(`😊 Emoción detectada: ${faceData.dominant_emotion}`, 'success');
-      } else {
-        addFaceLog(faceData.message || 'No se detectó rostro', 'warning');
+      // Nuevo flujo: usar respuesta estilo DeepFace del backend
+      const details = faceData?.details || [];
+      const faceCount = faceData?.face_count ?? details.length;
+
+      if (!details.length || faceCount === 0) {
+        setCurrentEmotions(null);
+        addFaceLog(faceData?.message || 'No se detectó rostro en la imagen', 'warning');
+        return;
       }
+
+      // Elegir rostro dominante: el que coincide con dominant_emotion o el primero
+      let selected = details.find(d => d.top_emotion === faceData?.dominant_emotion) || details[0];
+      let scores = selected?.scores || faceData?.attributes?.emotion || null;
+
+      if (!scores || typeof scores !== 'object') {
+        addFaceLog('No se pudieron obtener las emociones del rostro', 'warning');
+        setCurrentEmotions(null);
+        return;
+      }
+
+      // Normalizar a [0,1] si vienen en porcentaje
+      const values = Object.values(scores);
+      const maxVal = Math.max(...values);
+      const normalized = Object.fromEntries(
+        Object.entries(scores).map(([k, v]) => [k, maxVal > 1 ? (Number(v) / 100) : Number(v)])
+      );
+
+      // Ordenar para log: top primero, luego secundarias
+      const ordered = Object.entries(normalized).sort((a, b) => b[1] - a[1]);
+      const top = ordered[0];
+      const secondary = ordered.slice(1).map(([k, v]) => `${k} ${(v * 100).toFixed(1)}%`).join(', ');
+
+      setCurrentEmotions(normalized);
+      addFaceLog(`😊 Emoción principal: ${top[0]} ${(top[1] * 100).toFixed(1)}% | Secundarias: ${secondary}`, 'success');
     } catch (error) {
       console.error('Error procesando rostro:', error);
       addFaceLog(`❌ Error: ${error.message}`, 'error');

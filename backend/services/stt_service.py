@@ -18,7 +18,7 @@ class STTService:
         elif self.service_type == "whisper":
             self.setup_whisper()
         else:
-            print(f"⚠️ Servicio STT no configurado: {self.service_type}")
+            print(f"[WARN] Servicio STT no configurado: {self.service_type}")
     
     def setup_azure(self):
         """Configurar Azure Speech Services"""
@@ -35,13 +35,13 @@ class STTService:
                 )
                 self.speech_config.speech_recognition_language = "es-ES"
                 self.configured = True
-                print("✓ Azure Speech configurado")
+                print("[OK] Azure Speech configurado")
             else:
                 self.configured = False
-                print("⚠️ Azure Speech no configurado. Configure AZURE_SPEECH_KEY y AZURE_SERVICE_REGION")
+                print("[WARN] Azure Speech no configurado. Configure AZURE_SPEECH_KEY y AZURE_SERVICE_REGION")
         except ImportError:
             self.configured = False
-            print("⚠️ Instale azure-cognitiveservices-speech")
+            print("[WARN] Instale azure-cognitiveservices-speech")
     
     def setup_google(self):
         """Configurar Google Speech-to-Text"""
@@ -50,13 +50,13 @@ class STTService:
             
             self.client = speech.SpeechClient()
             self.configured = True
-            print("✓ Google Speech configurado")
+            print("[OK] Google Speech configurado")
         except ImportError:
             self.configured = False
-            print("⚠️ Instale google-cloud-speech")
+            print("[WARN] Instale google-cloud-speech")
         except Exception as e:
             self.configured = False
-            print(f"⚠️ Error configurando Google Speech: {e}")
+            print(f"[WARN] Error configurando Google Speech: {e}")
     
     def setup_whisper(self):
         """Configurar OpenAI Whisper (local)"""
@@ -66,13 +66,13 @@ class STTService:
             model_size = os.getenv("WHISPER_MODEL_SIZE", "base")
             self.model = whisper.load_model(model_size)
             self.configured = True
-            print(f"✓ Whisper configurado (modelo: {model_size})")
+            print(f"[OK] Whisper configurado (modelo: {model_size})")
         except ImportError:
             self.configured = False
-            print("⚠️ Instale openai-whisper")
+            print("[WARN] Instale openai-whisper")
         except Exception as e:
             self.configured = False
-            print(f"⚠️ Error configurando Whisper: {e}")
+            print(f"[WARN] Error configurando Whisper: {e}")
     
     def is_available(self):
         """Verificar si el servicio está disponible"""

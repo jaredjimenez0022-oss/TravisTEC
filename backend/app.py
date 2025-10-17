@@ -5,7 +5,8 @@ from pydantic import BaseModel
 import uvicorn
 from services.model_runner import ModelRunner
 from services.stt_service import STTService
-from services.emotion_local_simple import analyze_image_file
+# Prefer DeepFace-based detector (multi-class) with fallback
+from services.emotion_deepface import analyze_image_file
 from services.stt_service import STTService
 import os
 import pandas as pd

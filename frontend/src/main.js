@@ -49,8 +49,7 @@ class JarvisTEC {
                 this.startAudioRecording();
             }
             
-            // Iniciar captura de frames para reconocimiento facial
-            this.captureFrames();
+            // Captura automática deshabilitada: solo analizar con snapshot manual
             
             this.addResult('Sistema iniciado correctamente');
         } catch (error) {
@@ -211,23 +210,7 @@ class JarvisTEC {
         return payload;
     }
     
-    async captureFrames() {
-        if (!this.isRecording) return;
-        
-        this.canvas.width = this.video.videoWidth;
-        this.canvas.height = this.video.videoHeight;
-        this.ctx.drawImage(this.video, 0, 0);
-        
-        // Convertir frame a blob
-        this.canvas.toBlob(async (blob) => {
-            if (blob) {
-                await this.processFace(blob);
-            }
-        }, 'image/jpeg');
-        
-        // Capturar cada 2 segundos
-        setTimeout(() => this.captureFrames(), 2000);
-    }
+    // captureFrames eliminado para evitar análisis periódicos
     
     async processAudio(audioBlob) {
         try {

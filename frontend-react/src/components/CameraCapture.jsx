@@ -6,6 +6,7 @@ function CameraCapture({ onSnapshot, onEmotionDetected, isActive }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
+  // Removed auto-capture interval to analyze only on manual snapshot
   const [captureInterval, setCaptureInterval] = useState(null);
 
   useEffect(() => {
@@ -33,12 +34,8 @@ function CameraCapture({ onSnapshot, onEmotionDetected, isActive }) {
       
       setStream(mediaStream);
 
-      // Captura automática cada 2 segundos
-      const interval = setInterval(() => {
-        captureFrame();
-      }, 2000);
-      
-      setCaptureInterval(interval);
+      // Auto-capture disabled: analysis happens only when user clicks snapshot
+      // If needed later, re-enable with setInterval and captureFrame()
     } catch (error) {
       console.error('Error al iniciar cámara:', error);
       alert('No se pudo acceder a la cámara. Verifica los permisos.');
@@ -51,30 +48,10 @@ function CameraCapture({ onSnapshot, onEmotionDetected, isActive }) {
       setStream(null);
     }
 
-    if (captureInterval) {
-      clearInterval(captureInterval);
-      setCaptureInterval(null);
-    }
+    // No periodic capture to clear
   };
 
-  const captureFrame = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    canvas.toBlob((blob) => {
-      if (blob && onEmotionDetected) {
-        onEmotionDetected(blob);
-      }
-    }, 'image/jpeg', 0.8);
-  };
+  // captureFrame was used for periodic captures; now rely solely on manual snapshot
 
   const takeManualSnapshot = () => {
     if (!videoRef.current || !canvasRef.current) return;
