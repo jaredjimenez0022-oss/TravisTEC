@@ -7,6 +7,10 @@ import random
 from typing import List, Dict, Any, Optional
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
+# Compatibility aliases: map legacy model names to current saved artifacts
+ALIASES = {
+    'car_model': 'car_price',
+}
 
 class ModelRunner:
     """
@@ -38,7 +42,13 @@ class ModelRunner:
                     traceback.print_exc()
 
     def get_available_models(self) -> List[str]:
-        return list(self.models.keys())
+        # include aliases as available names for convenience
+        names = list(self.models.keys())
+        # expose alias keys if their targets exist
+        for alias, target in ALIASES.items():
+            if target in self.models and alias not in names:
+                names.append(alias)
+        return names
 
     def is_ready(self) -> bool:
         return len(self.models) > 0
@@ -83,63 +93,171 @@ class ModelRunner:
             if m in ("bitcoin_model",):
                 # Bitcoin - Predicción a CORTO PLAZO (días, no años)
                 # Features: price_lag_1, price_lag_2, price_lag_3, price_lag_7, rolling_mean_7, rolling_mean_30
-                days = float(params.get("days", params.get("years", 1)))
+                # Accept either 'days' or 'years' in params. Convert years -> days.
+                years_val = params.get('years') if params and 'years' in params else None
+                days_val = params.get('days') if params and 'days' in params else None
+                if years_val is not None:
+                    try:
+                        horizon_days = int(float(years_val) * 365)
+                    except Exception:
+                        horizon_days = int(float(years_val))
+                else:
+                    try:
+                        horizon_days = int(float(days_val)) if days_val is not None else 1
+                    except Exception:
+                        horizon_days = 1
+
                 # Precio base más realista
-                random.seed(int(days * 137))  # Seed único por día
-                base_price = 45000.0 + (days * random.uniform(50, 150))  # Variación diaria ~$50-150
+                random.seed(int(max(1, horizon_days) * 137))  # Seed único por día
+                base_price = 45000.0 + (horizon_days * random.uniform(50, 150))  # Variación diaria ~$50-150
                 volatility = random.uniform(0.97, 1.03)  # ±3% volatilidad diaria
+                # Return 7 features matching training: 6 price-derived features + horizon_days
                 return [
                     base_price * volatility,
                     base_price * 0.998 * volatility,
                     base_price * 0.997 * volatility,
                     base_price * 0.995 * volatility,
                     base_price * 0.999 * volatility,
-                    base_price * 1.001 * volatility
+                    base_price * 1.001 * volatility,
+                    float(horizon_days)
                 ]
             if m in ("sp500_model",):
                 # SP500 - Predicción a CORTO PLAZO (días)
                 # Features: open, high, low, volume, price_change, high_low_diff, close_lag_1, close_lag_5, close_lag_10, rolling_mean_5, rolling_mean_20
-                days = float(params.get("days", params.get("years", 1)))
-                random.seed(int(days * 271))  # Seed único por día
-                base = 4500.0 + (days * random.uniform(5, 20))  # Variación diaria ~$5-20
+                # Accept 'days' or 'years' and convert to days
+                years_val = params.get('years') if params and 'years' in params else None
+                days_val = params.get('days') if params and 'days' in params else None
+                if years_val is not None:
+                    try:
+                        horizon_days = int(float(years_val) * 365)
+                    except Exception:
+                        horizon_days = int(float(years_val))
+                else:
+                    try:
+                        horizon_days = int(float(days_val)) if days_val is not None else 1
+                    except Exception:
+                        horizon_days = 1
+
+                random.seed(int(max(1, horizon_days) * 271))  # Seed único por día
+                base = 4500.0 + (horizon_days * random.uniform(5, 20))  # Variación diaria ~$5-20
                 vol_factor = random.uniform(0.98, 1.02)  # ±2% volatilidad
+                # Return 12 features: the 11 price/volume features plus horizon_days
                 return [
                     base * vol_factor,
                     base * 1.005 * vol_factor,
                     base * 0.995 * vol_factor,
-                    5000000 + int(days * 50000),
+                    5000000 + int(horizon_days * 50000),
                     random.uniform(-20, 20),
                     random.uniform(10, 30),
                     base * 0.999 * vol_factor,
                     base * 0.997 * vol_factor,
                     base * 0.995 * vol_factor,
                     base * vol_factor,
-                    base * 1.002 * vol_factor
+                    base * 1.002 * vol_factor,
+                    float(horizon_days)
                 ]
             if m in ("avocado_model", "avocado_price"):
-                # Avocado - Predicción a CORTO PLAZO (días)
-                # Features: Total Volume, 4046, 4225, 4770, Total Bags, Small Bags, Large Bags, XLarge Bags, type_encoded, region_encoded, year
-                days = float(params.get("days", params.get("years", 1)))
-                random.seed(int(days * 181))  # Seed único por día
+                # Avocado - Predicción a CORTO PLAZO (months)
+                # Features: Total Volume, 4046, 4225, 4770, Total Bags, Small Bags, Large Bags, XLarge Bags,
+                # type_encoded, region_encoded, year, horizon_months
+                # Accept 'months' or 'days' or 'years' in params; convert to months
+                months_val = None
+                if params:
+                    if 'months' in params:
+                        months_val = params.get('months')
+                    elif 'days' in params:
+                        try:
+                            months_val = float(params.get('days')) / 30.0
+                        except Exception:
+                            months_val = None
+                    elif 'years' in params:
+                        try:
+                            months_val = float(params.get('years')) * 12.0
+                        except Exception:
+                            months_val = None
+                try:
+                    horizon_months = int(float(months_val)) if months_val is not None else 1
+                except Exception:
+                    horizon_months = 1
+
+                random.seed(int(max(1, horizon_months) * 181))  # Seed único por mes
                 year_value = 2025  # Año actual
-                # Variamos volúmenes ligeramente por día
-                vol_factor = 1.0 + (days * 0.002 * random.uniform(0.95, 1.05))  # Variación muy pequeña diaria
+                # Small variations by months
+                vol_factor = 1.0 + (horizon_months * 0.01 * random.uniform(0.95, 1.05))
+                # Build realistic-looking features matching trainer feature_cols:
+                # ['avg_price','total_volume','v_4046','v_4225','v_4770','total_bags','small_bags','large_bags','xlarge_bags','lag_1','lag_3','rolling_3','horizon_months']
+                avg_price = 1.5 * vol_factor
+                total_volume = 100000 * vol_factor
+                v_4046 = 50000 * vol_factor
+                v_4225 = 30000 * vol_factor
+                v_4770 = 10000 * vol_factor
+                total_bags = 5000 * vol_factor
+                small_bags = 4000 * vol_factor
+                large_bags = 800 * vol_factor
+                xlarge_bags = 200 * vol_factor
+                # lag features derived from avg_price
+                lag_1 = avg_price * 0.99
+                lag_3 = avg_price * 0.97
+                rolling_3 = (avg_price * 0.99 + avg_price * 0.98 + avg_price * 1.0) / 3.0
                 return [
-                    100000 * vol_factor,
-                    50000 * vol_factor,
-                    30000 * vol_factor,
-                    10000 * vol_factor,
-                    5000 * vol_factor,
-                    4000 * vol_factor,
-                    800 * vol_factor,
-                    200 * vol_factor,
-                    random.choice([0, 1]),  # tipo: convencional u orgánico
-                    random.randint(0, 5),  # región aleatoria
-                    year_value
+                    avg_price,
+                    total_volume,
+                    v_4046,
+                    v_4225,
+                    v_4770,
+                    total_bags,
+                    small_bags,
+                    large_bags,
+                    xlarge_bags,
+                    lag_1,
+                    lag_3,
+                    rolling_3,
+                    float(horizon_months)
                 ]
-            if m in ("london_crime", "chicago_crime", "london_crime_model", "chicago_crime_model"):
-                # espera {'day_of_week': 'monday'} -> map to int 0..6
-                # London/Chicago necesitan: day_of_week, hour, district, month, population_density
+            if m in ("london_crime", "london_crime_model"):
+                # London model expects ['month','day_of_week','borough_le']
+                dow = params.get("day_of_week", params.get("day"))
+                day_idx = 4
+                if isinstance(dow, str):
+                    mapping = {
+                        "monday":0,"mon":0,"lunes":0,
+                        "tuesday":1,"tue":1,"martes":1,
+                        "wednesday":2,"wed":2,"miercoles":2,"miércoles":2,
+                        "thursday":3,"thu":3,"jueves":3,
+                        "friday":4,"fri":4,"viernes":4,
+                        "saturday":5,"sat":5,"sabado":5,"sábado":5,
+                        "sunday":6,"sun":6,"domingo":6
+                    }
+                    key = dow.strip().lower()
+                    day_idx = mapping.get(key, 4)
+                elif isinstance(dow, int):
+                    if dow > 6:
+                        day_idx = (int(dow) - 1) % 7
+                    else:
+                        day_idx = int(dow)
+
+                month = int(params.get('month', 10))
+                # borough parameter - accept 'borough' or 'borough_le'
+                borough = params.get('borough', params.get('borough_le', params.get('borough_name', None)))
+                borough_le = 0
+                try:
+                    pkg = self.models.get('london_crime_model')
+                    if isinstance(pkg, dict) and 'encoder' in pkg:
+                        enc = pkg['encoder']
+                        # encoder expected to be a LabelEncoder-like object
+                        if borough is None:
+                            borough_le = int(enc.transform([enc.classes_[0]])[0]) if hasattr(enc, 'classes_') else 0
+                        else:
+                            borough_le = int(enc.transform([str(borough)])[0])
+                    else:
+                        borough_le = int(params.get('borough_le', 0) or 0)
+                except Exception:
+                    borough_le = int(params.get('borough_le', 0) or 0)
+
+                return [float(month), float(day_idx), float(borough_le)]
+
+            if m in ("chicago_crime", "chicago_crime_model"):
+                # For Chicago trainer we expect features: dow0 (0=Monday), month, community_area
                 dow = params.get("day_of_week", params.get("day"))
                 day_idx = 4  # Default viernes
                 if isinstance(dow, str):
@@ -155,9 +273,31 @@ class ModelRunner:
                     key = dow.strip().lower()
                     day_idx = mapping.get(key, 4)
                 elif isinstance(dow, int):
-                    day_idx = dow
-                # Retornar: day_of_week, hour (12pm), district (1), month (10), population_density (50.0)
-                return [float(day_idx), 12.0, 1.0, 10.0, 50.0]
+                    # allow BigQuery style dayofweek (1=Sunday) or 0..6
+                    if dow > 6:
+                        # assume BigQuery 1..7 -> convert to 0..6
+                        day_idx = (int(dow) - 1) % 7
+                    else:
+                        day_idx = int(dow)
+
+                month = int(params.get('month', 10))
+                community_area = int(params.get('community_area', params.get('district', -1) or -1))
+                # Check if a pre-trained chicago model exists and what feature count it expects
+                try:
+                    loaded = self.models.get('chicago_crime') or self.models.get('chicago_crime_model')
+                    model_obj = None
+                    if isinstance(loaded, dict) and 'model' in loaded:
+                        model_obj = loaded['model']
+                    else:
+                        model_obj = loaded
+                    if model_obj is not None and hasattr(model_obj, 'n_features_in_'):
+                        expected = int(getattr(model_obj, 'n_features_in_', 0))
+                        if expected == 1:
+                            return [float(day_idx)]
+                except Exception:
+                    # ignore and return full feature set
+                    pass
+                return [float(day_idx), float(month), float(community_area)]
             if m in ("airline_delay", "airline_delay_model"):
                 # Airline necesita: Month, DayofMonth, DayOfWeek, DepTime, CRSDepTime, CRSArrTime, Distance, + encoders
                 # Aproximadamente 7-10 features según el modelo entrenado
@@ -173,31 +313,65 @@ class ModelRunner:
                 dest = 0  # Código destino (0-N)
                 return [month, day, day_of_week, dep_time, crs_dep_time, crs_arr_time, distance, carrier, origin, dest]
             if m in ("cirrhosis_classifier", "cirrhosis_model"):
-                # Cirrosis necesita: N_Days, Age, Bilirubin, Cholesterol, Albumin, Copper, Alk_Phos, SGOT, 
-                # Tryglicerides, Platelets, Prothrombin, Stage, + encoders (Drug, Sex, Ascites, Hepatomegaly, Spiders, Edema)
-                # Total: 12 numeric + 6 categóricos = 18 features
-                age = float(params.get("age", 18250))  # Age en días (50 años ≈ 18250 días)
-                bilirubin = float(params.get("bilirubin", 1.5))
-                n_days = float(params.get("n_days", 1000))  # Días desde diagnóstico
-                cholesterol = float(params.get("cholesterol", 280))
-                albumin = float(params.get("albumin", 3.5))
-                copper = float(params.get("copper", 70))
-                alk_phos = float(params.get("alk_phos", 1200))
-                sgot = float(params.get("sgot", 100))
-                tryglicerides = float(params.get("tryglicerides", 100))
-                platelets = float(params.get("platelets", 250))
-                prothrombin = float(params.get("prothrombin", 11))
-                stage = float(params.get("stage", 3))  # Etapa de la enfermedad (1-4)
-                # Encoders categóricos (valores por defecto)
-                drug = 0  # 0=D-penicillamine, 1=Placebo
-                sex = 0  # 0=F, 1=M
-                ascites = 0  # 0=N, 1=Y
-                hepatomegaly = 1  # 0=N, 1=Y
-                spiders = 0  # 0=N, 1=Y
-                edema = 0  # 0=N, 1=S, 2=Y
-                return [n_days, age, bilirubin, cholesterol, albumin, copper, alk_phos, sgot, 
-                       tryglicerides, platelets, prothrombin, stage, drug, sex, ascites, 
-                       hepatomegaly, spiders, edema]
+                # Cirrosis feature order must match trainer:
+                # cols_num (N_Days, Age, Bilirubin, Cholesterol, Albumin, Copper, Alk_Phos, SGOT, Tryglicerides, Platelets, Prothrombin)
+                # + bools (Ascites_bin, Hepatomegaly_bin, Spiders_bin, Edema_bin)
+                # + Sex_le, Drug_le  => total 17 features
+                n_days = float(params.get("n_days", params.get('N_Days', 1000)))  # Días desde diagnóstico
+                age = float(params.get("age", params.get('Age', 18250)))  # Age en días fallback
+                bilirubin = float(params.get("bilirubin", params.get('Bilirubin', 1.5)))
+                cholesterol = float(params.get("cholesterol", params.get('Cholesterol', 280)))
+                albumin = float(params.get("albumin", params.get('Albumin', 3.5)))
+                copper = float(params.get("copper", params.get('Copper', 70)))
+                alk_phos = float(params.get("alk_phos", params.get('Alk_Phos', 1200)))
+                sgot = float(params.get("sgot", params.get('SGOT', 100)))
+                tryglicerides = float(params.get("tryglicerides", params.get('Tryglicerides', 100)))
+                platelets = float(params.get("platelets", params.get('Platelets', 250)))
+                prothrombin = float(params.get("prothrombin", params.get('Prothrombin', 11)))
+
+                # Boolean flags: accept 'Y'/'N', True/False, 1/0, or numeric
+                def _to_bin(v):
+                    if v is None:
+                        return 0
+                    if isinstance(v, (int, float)):
+                        return 1 if float(v) != 0 else 0
+                    s = str(v).strip().upper()
+                    if s in ('Y','YES','1','TRUE'):
+                        return 1
+                    return 0
+
+                ascites = _to_bin(params.get('Ascites', params.get('ascites', 0)))
+                hepatomegaly = _to_bin(params.get('Hepatomegaly', params.get('hepatomegaly', 0)))
+                spiders = _to_bin(params.get('Spiders', params.get('spiders', 0)))
+                # Edema in dataset had values like '0','S','Y' - map similarly
+                edema = _to_bin(params.get('Edema', params.get('edema', 0)))
+
+                # Sex and Drug - use saved encoders if available to ensure consistent mapping
+                drug_val = params.get('Drug', params.get('drug', 'Unknown'))
+                sex_val = params.get('Sex', params.get('sex', 'U'))
+                drug_le = 0
+                sex_le = 0
+                # try to use encoders stored with model package
+                try:
+                    pkg = self.models.get(model_name)
+                    encs = pkg.get('encoders', {}) if isinstance(pkg, dict) else {}
+                    if 'sex' in encs:
+                        sex_le = int(encs['sex'].transform([str(sex_val)])[0])
+                    else:
+                        sex_le = 1 if str(sex_val).strip().upper() in ('M','MALE') else 0
+                    if 'drug' in encs:
+                        drug_le = int(encs['drug'].transform([str(drug_val)])[0])
+                    else:
+                        drug_le = 0
+                except Exception:
+                    # graceful fallback
+                    sex_le = 1 if str(sex_val).strip().upper() in ('M','MALE') else 0
+                    drug_le = 0
+
+                return [n_days, age, bilirubin, cholesterol, albumin, copper, alk_phos, sgot,
+                        tryglicerides, platelets, prothrombin,
+                        ascites, hepatomegaly, spiders, edema,
+                        sex_le, drug_le]
             if m == "movie_recommender":
                 # recommender idealmente expone método recommend(user_id, k)
                 # aquí no convertimos a features, se manejará aparte.
@@ -215,8 +389,13 @@ class ModelRunner:
           - Para recommenders: si el modelo tiene método 'recommend' se llama con user_id/k.
         Devuelve dict con keys: model, input, prediction.
         """
+        # resolve aliases
         if model_name not in self.models:
-            raise ValueError(f"Modelo '{model_name}' no cargado. Modelos disponibles: {self.get_available_models()}")
+            if model_name in ALIASES:
+                resolved = ALIASES[model_name]
+                model_name = resolved
+            else:
+                raise ValueError(f"Modelo '{model_name}' no cargado. Modelos disponibles: {self.get_available_models()}")
 
         # Extraer el objeto modelo real (puede estar en dict['model'] o directamente)
         model_obj = self._get_model_object(model_name)
@@ -225,25 +404,49 @@ class ModelRunner:
         
         # Caso especial: movie recommender
         if model_name == "movie_recommender":
-            # El modelo está en un dict, necesitamos acceder a los datos
+            # The saved recommender is a dict with a DataFrame 'movies'
             loaded = self.models[model_name]
             if isinstance(loaded, dict):
-                top_k = int(params.get("top_k", 1)) if params else 1  # Default 1 película
-                # Recomendar películas aleatoriamente diferentes cada vez
-                movies = loaded.get('movies', [])
-                if len(movies) > 0:
-                    import random
-                    import time
-                    # Usar timestamp para seed diferente en cada llamada
+                top_k = int(params.get("top_k", 1)) if params else 1  # Default 1 movie
+                year = params.get('year') if params else None
+                genre = params.get('genre') if params else None
+
+                movies_df = loaded.get('movies')
+                if movies_df is None:
+                    return {"model": model_name, "input": params or {}, "prediction": []}
+
+                # If movies_df is a DataFrame, filter by year/genre and return top_k by popularity
+                try:
+                    df = movies_df
+                    # filter by year if provided
+                    if year is not None:
+                        try:
+                            y = int(year)
+                            df = df[df['year'] == y]
+                        except Exception:
+                            pass
+                    # filter by genre if provided (case-insensitive substring in genres_str or in genres_list)
+                    if genre:
+                        g = str(genre).strip().lower()
+                        df = df[df['genres_str'].str.lower().str.contains(g, na=False) | df['genres_list'].apply(lambda gl: any(g == gg.lower() for gg in gl))]
+
+                    # If after filtering we have no matches, fallback to the full list
+                    if df.shape[0] == 0:
+                        df = movies_df
+
+                    # Sort by popularity and take top_k
+                    df_sorted = df.sort_values('popularity', ascending=False).head(top_k)
+                    titles = df_sorted['title'].tolist()
+                    return {"model": model_name, "input": params or {}, "prediction": titles}
+                except Exception as e:
+                    # fallback: if movies is a list
+                    import random, time
                     random.seed(int(time.time() * 1000))
-                    if hasattr(movies, 'sample'):
-                        # Si es DataFrame
-                        recs = movies.sample(n=min(top_k, len(movies)))['title'].tolist()
-                    else:
-                        # Si es lista
-                        recs = random.sample(movies, min(top_k, len(movies)))
-                    return {"model": model_name, "input": params or {}, "prediction": recs}
-                return {"model": model_name, "input": params or {}, "prediction": []}
+                    movies_list = loaded.get('movies', [])
+                    if isinstance(movies_list, list) and len(movies_list) > 0:
+                        recs = random.sample(movies_list, min(top_k, len(movies_list)))
+                        return {"model": model_name, "input": params or {}, "prediction": recs}
+                    return {"model": model_name, "input": params or {}, "prediction": []}
         
         # si pasaron features explícitos
         if features is not None:

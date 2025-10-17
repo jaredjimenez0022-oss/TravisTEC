@@ -10,7 +10,8 @@ from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
 import numpy as np
 
-DATA = Path(__file__).parent.parent / 'datasets' / 'bitcoin.csv'
+# The repo provides CSV files under datasets/bitcoin
+DATA = Path(__file__).parent.parent / 'datasets' / 'bitcoin' / 'bitcoin_price_Training - Training.csv'
 MODEL_OUT = Path(__file__).parent.parent / 'models' / 'bitcoin_model.joblib'
 
 def main():
@@ -37,24 +38,46 @@ def main():
     df['price'] = pd.to_numeric(df[price_col], errors='coerce')
     df = df.dropna(subset=['price'])
     
-    # Create lag features
+    # Create lag features and rolling means
     for lag in [1, 2, 3, 7]:
         df[f'price_lag_{lag}'] = df['price'].shift(lag)
-    
-    # Rolling averages
+
     df['rolling_mean_7'] = df['price'].rolling(window=7).mean()
     df['rolling_mean_30'] = df['price'].rolling(window=30).mean()
-    
-    # Drop rows with NaN
-    df = df.dropna()
-    
-    if len(df) < 100:
-        print("Not enough data after feature engineering")
+
+    # We'll create supervised examples for several horizons (days): 1,7,30,90,180,365
+    horizons = [1, 7, 30, 90, 180, 365]
+    rows = []
+    for i in range(len(df)):
+        row = df.iloc[i]
+        if i < 30:
+            continue
+        for h in horizons:
+            tgt_idx = i + h
+            if tgt_idx >= len(df):
+                continue
+            tgt_price = df.iloc[tgt_idx]['price']
+            feat = {
+                'price_lag_1': df.iloc[i]['price_lag_1'],
+                'price_lag_2': df.iloc[i]['price_lag_2'],
+                'price_lag_3': df.iloc[i]['price_lag_3'],
+                'price_lag_7': df.iloc[i]['price_lag_7'],
+                'rolling_mean_7': df.iloc[i]['rolling_mean_7'],
+                'rolling_mean_30': df.iloc[i]['rolling_mean_30'],
+                'horizon_days': h,
+                'target_price': tgt_price
+            }
+            rows.append(feat)
+
+    df_sup = pd.DataFrame(rows)
+    df_sup = df_sup.dropna()
+    if len(df_sup) < 50:
+        print('Not enough supervised examples to train')
         return
-    
-    feature_cols = [f'price_lag_{lag}' for lag in [1, 2, 3, 7]] + ['rolling_mean_7', 'rolling_mean_30']
-    X = df[feature_cols]
-    y = df['price']
+
+    feature_cols = ['price_lag_1', 'price_lag_2', 'price_lag_3', 'price_lag_7', 'rolling_mean_7', 'rolling_mean_30', 'horizon_days']
+    X = df_sup[feature_cols]
+    y = df_sup['target_price']
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
@@ -70,8 +93,11 @@ def main():
     print(f'Mean price: ${y_test.mean():.2f}')
     
     MODEL_OUT.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(model, MODEL_OUT)
-    print(f'Saved model to {MODEL_OUT}')
+    # Save model with metadata: include last date from original df
+    last_date = pd.to_datetime(df['Date'].iloc[-1]) if 'Date' in df.columns else None
+    package = {'model': model, 'feature_cols': feature_cols, 'last_date': last_date}
+    joblib.dump(package, MODEL_OUT)
+    print(f'Saved model+metadata to {MODEL_OUT} (last_date={last_date})')
 
 if __name__ == '__main__':
     main()

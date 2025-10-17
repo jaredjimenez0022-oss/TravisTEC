@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
 
-DATA = Path(__file__).parent.parent / 'datasets' / 'bodyfat.csv'
+DATA = Path(__file__).parent.parent / 'datasets' / 'bodymass' / 'bodyfat.csv'
 MODEL_OUT = Path(__file__).parent.parent / 'models' / 'bmi_model.joblib'
 
 def main():

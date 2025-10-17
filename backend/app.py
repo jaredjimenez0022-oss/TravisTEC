@@ -11,6 +11,8 @@ import os
 import pandas as pd
 from pathlib import Path
 import random
+import numpy as np
+from fastapi import Request
 
 app = FastAPI(title="Jarvis TEC API")
 
@@ -146,29 +148,63 @@ async def execute_command(payload: dict):
         elif task == 'bitcoin':
             # Predicción Bitcoin - Proyección estadística desde precio base del dataset
             try:
-                days = params.get('days', params.get('years', 1))
-                
-                # Leer precio actual del dataset
-                dataset_path = Path(__file__).parent / 'datasets' / 'bitcoin.csv'
-                base_price = 45000.0  # Precio fallback
-                
-                if dataset_path.exists():
-                    df = pd.read_csv(dataset_path, nrows=100)
-                    price_col = next((col for col in df.columns if 'close' in col.lower() or 'price' in col.lower()), None)
-                    if price_col:
-                        try:
-                            base_price = float(str(df[price_col].iloc[0]).replace(',', ''))
-                        except:
-                            base_price = 45000.0
-                
-                # Proyección con volatilidad diaria realista
-                random.seed(int(days * 1337))  # Seed único por cantidad de días
-                
-                # Simular tendencia alcista con volatilidad
-                daily_change = random.uniform(-0.02, 0.03)  # -2% a +3% diario
-                projected_price = base_price * ((1 + daily_change) ** days)
-                
-                response_text = f"₿ Bitcoin en {days} día{'s' if days != 1 else ''}: ${projected_price:,.2f} USD"
+                years = float(params.get('years', params.get('days', 1)))
+                # convert years to days
+                horizon_days = int(years * 365)
+
+                # Load trained bitcoin model package
+                bm = model_runner.models.get('bitcoin_model')
+                if bm is None:
+                    return {"response": "₿ Bitcoin model not available on server"}
+
+                # bm may be a dict with 'model' and 'last_date'
+                if isinstance(bm, dict) and 'model' in bm:
+                    model_pkg = bm
+                else:
+                    # some saved formats store the model directly; handle both
+                    model_pkg = {'model': bm, 'last_date': None}
+
+                model_obj = model_pkg.get('model')
+                last_date = model_pkg.get('last_date')
+
+                # For features we will use a naive approach: use the most recent row from the dataset
+                btc_csv = Path(__file__).parent / 'datasets' / 'bitcoin' / 'bitcoin_price_Training - Training.csv'
+                if btc_csv.exists():
+                    df = pd.read_csv(btc_csv)
+                    # ensure numeric close
+                    price_col = next((c for c in df.columns if 'close' in c.lower() or 'price' in c.lower()), 'Close')
+                    df['price'] = pd.to_numeric(df[price_col].str.replace(',', ''), errors='coerce') if df[price_col].dtype == object else pd.to_numeric(df[price_col], errors='coerce')
+                    df['price_lag_1'] = df['price'].shift(1)
+                    df['price_lag_2'] = df['price'].shift(2)
+                    df['price_lag_3'] = df['price'].shift(3)
+                    df['price_lag_7'] = df['price'].shift(7)
+                    df['rolling_mean_7'] = df['price'].rolling(7).mean()
+                    df['rolling_mean_30'] = df['price'].rolling(30).mean()
+                    recent = df.dropna().iloc[-1]
+                    features = [recent['price_lag_1'], recent['price_lag_2'], recent['price_lag_3'], recent['price_lag_7'], recent['rolling_mean_7'], recent['rolling_mean_30'], horizon_days]
+                else:
+                    # fallback synthetic features
+                    features = [45000.0, 44900.0, 44850.0, 44700.0, 44800.0, 45000.0, horizon_days]
+
+                X = np.array(features).reshape(1, -1)
+                pred = model_obj.predict(X)
+                price_usd = float(pred[0])
+
+                # Compute exact date if metadata present
+                target_date = None
+                if last_date is not None:
+                    try:
+                        if isinstance(last_date, str):
+                            ld = pd.to_datetime(last_date)
+                        else:
+                            ld = pd.to_datetime(last_date)
+                        target_date = (ld + pd.Timedelta(days=horizon_days)).date().isoformat()
+                    except Exception:
+                        target_date = None
+
+                response_text = f"₿ Bitcoin en {years} año(s): ${price_usd:,.2f} USD"
+                if target_date:
+                    response_text += f" | Fecha objetivo: {target_date}"
             except Exception as e:
                 response_text = f"₿ Error: {str(e)}"
         
@@ -194,8 +230,31 @@ async def execute_command(payload: dict):
                 year = params.get('year', 2015)
                 km = params.get('km', 50000)
                 result = model_runner.predict("car_model", params={"year": year, "km": km})
+                # model may return list-like predictions
                 price = result.get('prediction', [0])[0]
-                response_text = f"🚗 Auto {year} con {km:,} km → Precio estimado: ${price:,.2f}"
+                try:
+                    price_val = float(price)
+                except Exception:
+                    price_val = 0.0
+
+                # The dataset 'Selling_Price' column uses dataset-specific units (e.g. lakhs).
+                # By default we assume 1 unit == 100000 (e.g. 1 lakh = 100,000 rupees).
+                unit_multiplier = float(os.getenv('CAR_PRICE_UNIT_MULTIPLIER', '100000'))
+                rupees = price_val * unit_multiplier
+
+                # Optional USD conversion: set env var CAR_PRICE_TO_USD_RATE (USD per rupee)
+                usd_rate = os.getenv('CAR_PRICE_TO_USD_RATE')
+                usd = None
+                if usd_rate:
+                    try:
+                        usd = rupees * float(usd_rate)
+                    except Exception:
+                        usd = None
+
+                response_text = f"🚗 Auto {year} con {km:,} km → Precio estimado: {price_val:,.2f} (dataset units)"
+                response_text += f" ≈ ₹{rupees:,.2f}"
+                if usd is not None:
+                    response_text += f" ≈ ${usd:,.2f} (converted)"
             except Exception as e:
                 response_text = f"🚗 Error: {str(e)}"
         
@@ -311,6 +370,416 @@ async def execute_command(payload: dict):
         import traceback
         traceback.print_exc()
         return {"response": f"❌ Error: {str(e)}"}
+
+
+@app.post('/api/v1/models/{model_name}')
+async def predict_model(model_name: str, payload: dict):
+    """Generic model prediction endpoint.
+
+    Accepts JSON of the form:
+      {"features": [..]}  -> uses explicit features
+      {"params": {...}}   -> uses param mapping in ModelRunner
+
+    Returns: {model, input, prediction, ...}
+    """
+    try:
+        features = payload.get('features') if isinstance(payload, dict) else None
+        params = payload.get('params') if isinstance(payload, dict) else None
+        res = model_runner.predict(model_name, features=features, params=params)
+        return res
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post('/api/v1/predict/car')
+async def predict_car(payload: dict):
+    try:
+        year = payload.get('year', payload.get('y', 2015))
+        km = payload.get('km', payload.get('kms', payload.get('mileage', 50000)))
+        res = model_runner.predict('car_model', params={'year': year, 'km': km})
+        return res
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post('/api/v1/predict/bitcoin')
+async def predict_bitcoin(payload: dict):
+    try:
+        years = payload.get('years', payload.get('y', 1))
+        res = model_runner.predict('bitcoin_model', params={'years': years})
+        return res
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post('/api/v1/predict/movie')
+async def predict_movie(payload: dict):
+    try:
+        top_k = int(payload.get('top_k', payload.get('k', 5)))
+        genre = payload.get('genre')
+        year = payload.get('year')
+        res = model_runner.predict('movie_recommender', params={'top_k': top_k, 'genre': genre, 'year': year})
+        return res
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get('/api/v1/models')
+async def list_models():
+    """Return a list of available model names (including aliases)."""
+    try:
+        names = model_runner.get_available_models()
+        return {"models": names}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post('/api/v1/predict/bmi')
+async def predict_bmi_endpoint(payload: dict):
+    try:
+        h = payload.get('height')
+        w = payload.get('weight')
+        age = payload.get('age', 30)
+        if h is None or w is None:
+            return {"error": "Provide 'height' and 'weight' in payload"}
+        res = model_runner.predict('bmi_model', params={'height': h, 'weight': w, 'age': age})
+        return res
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post('/api/v1/predict/sp500')
+async def predict_sp500(payload: dict):
+    try:
+        days = payload.get('days', payload.get('years', 1))
+        res = model_runner.predict('sp500_model', params={'days': days})
+        return res
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post('/api/v1/predict/avocado')
+async def predict_avocado(payload: dict):
+    try:
+        # Accept months | years | days and convert to months for the avocado model
+        months = None
+        if 'months' in payload:
+            months = payload.get('months')
+        elif 'years' in payload:
+            try:
+                months = float(payload.get('years')) * 12.0
+            except Exception:
+                months = None
+        elif 'days' in payload:
+            try:
+                months = float(payload.get('days')) / 30.0
+            except Exception:
+                months = None
+        try:
+            horizon_months = int(float(months)) if months is not None else 1
+        except Exception:
+            horizon_months = 1
+
+        # Call ModelRunner to get a prediction (it will build features from params)
+        res = model_runner.predict('avocado_model', params={'months': horizon_months})
+
+        # Extract numeric prediction
+        pred_val = None
+        try:
+            pred_list = res.get('prediction') if isinstance(res, dict) else None
+            if isinstance(pred_list, list) and len(pred_list) > 0:
+                pred_val = float(pred_list[0])
+            elif pred_list is not None:
+                pred_val = float(pred_list)
+        except Exception:
+            pred_val = None
+
+        # Compute exact target date if the saved model package contains last_date
+        target_date = None
+        try:
+            pkg = model_runner.models.get('avocado_model')
+            last_date = None
+            if isinstance(pkg, dict):
+                last_date = pkg.get('last_date')
+            # If last_date present, compute last_date + horizon_months
+            if last_date is not None:
+                ld = pd.to_datetime(last_date)
+                target = ld + pd.DateOffset(months=horizon_months)
+                target_date = target.date().isoformat()
+        except Exception:
+            target_date = None
+
+        return {
+            'model': 'avocado_model',
+            'horizon_months': horizon_months,
+            'price_usd': (pred_val if pred_val is None else float(pred_val)),
+            'target_date': target_date,
+            'raw': res
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post('/api/v1/predict/london')
+async def predict_london(payload: dict):
+    try:
+        day = payload.get('day', payload.get('day_of_week', 'viernes'))
+        res = model_runner.predict('london_crime_model', params={'day_of_week': day})
+        return res
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post('/api/v1/predict/chicago')
+async def predict_chicago(payload: dict):
+    try:
+        # Accept day (or day_of_week), optional month and community_area/district
+        day = payload.get('day', payload.get('day_of_week', 'viernes'))
+        month = payload.get('month', payload.get('m', None))
+        community_area = payload.get('community_area', payload.get('area', payload.get('district', None)))
+
+        params = {'day_of_week': day}
+        if month is not None:
+            params['month'] = month
+        if community_area is not None:
+            params['community_area'] = community_area
+
+        res = model_runner.predict('chicago_crime', params=params)
+
+        # Extract numeric prediction value if available
+        pred_val = None
+        try:
+            pred_list = res.get('prediction') if isinstance(res, dict) else None
+            if isinstance(pred_list, list) and len(pred_list) > 0:
+                pred_val = float(pred_list[0])
+            elif pred_list is not None:
+                pred_val = float(pred_list)
+        except Exception:
+            pred_val = None
+
+        return {
+            'model': 'chicago_crime',
+            'input': params,
+            'predicted_crimes': pred_val,
+            'raw': res
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post('/api/v1/predict/cirrhosis')
+async def predict_cirrhosis(payload: dict):
+    try:
+        # pass-through medical params; model_runner will attempt conversion
+        res = model_runner.predict('cirrhosis_model', params=payload)
+
+        # If the saved model package contains a label encoder for the target
+        # decode the predicted numeric label to a human readable class.
+        pkg = model_runner.models.get('cirrhosis_model')
+        le = None
+        if isinstance(pkg, dict):
+            le = pkg.get('le_target') or pkg.get('label_encoder')
+
+        # Normalize response structure
+        prediction = None
+        probabilities = None
+        raw = res
+
+        # res may be a dict with 'prediction' key or a raw prediction
+        if isinstance(res, dict) and 'prediction' in res:
+            prediction = res.get('prediction')
+            # some model_runner returns probability or proba
+            probabilities = res.get('probability') or res.get('probabilities') or res.get('proba')
+        elif isinstance(res, (list, tuple)):
+            prediction = list(res)
+        else:
+            prediction = res
+
+        decoded = None
+        try:
+            # prediction is often [label] or scalar
+            pred_val = None
+            if isinstance(prediction, list) and len(prediction) > 0:
+                pred_val = prediction[0]
+            else:
+                pred_val = prediction
+
+            if le is not None and pred_val is not None:
+                # le may be a sklearn LabelEncoder or similar with inverse_transform
+                try:
+                    decoded = le.inverse_transform([int(pred_val)])[0]
+                except Exception:
+                    # try if le stored classes_ as list of labels
+                    try:
+                        classes = getattr(le, 'classes_', None) or le
+                        decoded = classes[int(pred_val)]
+                    except Exception:
+                        decoded = None
+        except Exception:
+            decoded = None
+
+        out = {
+            'model': 'cirrhosis_model',
+            'input': payload,
+            'prediction_raw': prediction,
+            'prediction_label': decoded,
+            'probabilities': probabilities,
+            'raw': raw
+        }
+
+        return out
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post('/api/v1/predict/airline')
+async def predict_airline(payload: dict):
+    try:
+        # Accept common keys with fallbacks
+        month = payload.get('month', payload.get('m', 6))
+        day = payload.get('day', payload.get('d', 15))
+        day_of_week = payload.get('day_of_week', payload.get('dow', None))
+        crs_dep_time = payload.get('crs_dep_time', payload.get('dep_time', payload.get('CRSDepTime', None)))
+        crs_arr_time = payload.get('crs_arr_time', payload.get('arr_time', payload.get('CRSArrTime', None)))
+        crs_elapsed = payload.get('crs_elapsed', payload.get('CRSElapsedTime', None))
+        distance = payload.get('distance', payload.get('dist', 500))
+        origin = payload.get('origin', payload.get('orig', payload.get('Origin', None)))
+        dest = payload.get('dest', payload.get('destination', payload.get('Dest', None)))
+        carrier = payload.get('carrier', payload.get('unique_carrier', payload.get('UniqueCarrier', None)))
+
+        params = {
+            'Month': month,
+            'DayofMonth': day,
+            'DayOfWeek': day_of_week if day_of_week is not None else 3,
+            'CRSDepTime': crs_dep_time if crs_dep_time is not None else 1200,
+            'CRSArrTime': crs_arr_time if crs_arr_time is not None else 1400,
+            'CRSElapsedTime': crs_elapsed if crs_elapsed is not None else 120,
+            'Distance': distance,
+            'Origin': origin or 'OTHER',
+            'Dest': dest or 'OTHER',
+            'UniqueCarrier': carrier or 'XX'
+        }
+
+        # If the trained airline model exists, use it for a probability + label
+        if 'airline_delay_model' in model_runner.get_available_models():
+            pkg = model_runner.models.get('airline_delay_model')
+            # Extract model and encoders
+            model_obj = pkg['model'] if isinstance(pkg, dict) and 'model' in pkg else pkg
+            encs = pkg.get('encoders', {}) if isinstance(pkg, dict) else {}
+
+            # Build feature vector using same logic as trainer
+            # Handle encoders (origin/dest/carrier)
+            origin_val = params['Origin']
+            dest_val = params['Dest']
+            carrier_val = params['UniqueCarrier']
+            try:
+                origin_le = encs['origin'].transform([origin_val])[0]
+            except Exception:
+                origin_le = encs['origin'].transform(['OTHER'])[0] if 'origin' in encs else 0
+            try:
+                dest_le = encs['dest'].transform([dest_val])[0]
+            except Exception:
+                dest_le = encs['dest'].transform(['OTHER'])[0] if 'dest' in encs else 0
+            try:
+                carrier_le = encs['carrier'].transform([carrier_val])[0]
+            except Exception:
+                carrier_le = 0
+
+            feature_list = [
+                float(params['Month']),
+                float(params['DayofMonth']),
+                float(params['DayOfWeek']),
+                float(params['CRSDepTime']),
+                float(params['CRSArrTime']),
+                float(params['CRSElapsedTime']),
+                float(params['Distance']),
+                float(origin_le),
+                float(dest_le),
+                float(carrier_le)
+            ]
+
+            X = np.array(feature_list).reshape(1, -1)
+            try:
+                prob = float(model_obj.predict_proba(X)[0,1]) if hasattr(model_obj, 'predict_proba') else None
+            except Exception:
+                prob = None
+            try:
+                pred = int(model_obj.predict(X)[0])
+            except Exception:
+                pred = None
+
+            return {
+                'model': 'airline_delay_model',
+                'input': params,
+                'prediction': {'delayed': bool(pred) if pred is not None else None, 'probability': prob},
+            }
+
+        # fallback: basic heuristic projection if model missing
+        response_text = f"✈️ Predicción simple (sin modelo entrenado): Mes {month}, Día {day}, Distancia {distance}"
+        return {'model': 'heuristic', 'input': params, 'prediction': response_text}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get('/api/v1/airline/metadata')
+async def airline_metadata():
+    """Return lists of origin/destination airport codes and carriers the model knows,
+    plus best-effort full names for common airports/carriers.
+    """
+    try:
+        pkg = model_runner.models.get('airline_delay_model')
+        encs = pkg.get('encoders', {}) if isinstance(pkg, dict) else {}
+
+        origin_codes = encs['origin'].classes_.tolist() if 'origin' in encs else []
+        dest_codes = encs['dest'].classes_.tolist() if 'dest' in encs else []
+        carrier_codes = encs['carrier'].classes_.tolist() if 'carrier' in encs else []
+
+        # Small built-in lookup for common IATA -> full airport name (not exhaustive)
+        airport_names = {
+            'IAD': 'Washington Dulles International Airport (IAD)',
+            'TPA': 'Tampa International Airport (TPA)',
+            'ATL': 'Hartsfield–Jackson Atlanta International Airport (ATL)',
+            'JFK': 'John F. Kennedy International Airport (JFK)',
+            'LAX': 'Los Angeles International Airport (LAX)',
+            'SFO': 'San Francisco International Airport (SFO)',
+            'ORD': "O'Hare International Airport (ORD)",
+            'DFW': 'Dallas/Fort Worth International Airport (DFW)',
+            'DEN': 'Denver International Airport (DEN)',
+            'MCO': 'Orlando International Airport (MCO)',
+            'BOS': 'Logan International Airport (BOS)',
+            'CLT': 'Charlotte Douglas International Airport (CLT)',
+            'IAH': 'George Bush Intercontinental Airport (IAH)',
+            'SEA': 'Seattle–Tacoma International Airport (SEA)',
+            'MSP': 'Minneapolis–Saint Paul International Airport (MSP)',
+            'SLC': 'Salt Lake City International Airport (SLC)',
+            'PHL': 'Philadelphia International Airport (PHL)',
+            'EWR': 'Newark Liberty International Airport (EWR)',
+            'BWI': 'Baltimore/Washington International Thurgood Marshall Airport (BWI)',
+            'IND': 'Indianapolis International Airport (IND)'
+        }
+
+        carrier_names = {
+            'WN': 'Southwest Airlines',
+            'AA': 'American Airlines',
+            'DL': 'Delta Air Lines',
+            'UA': 'United Airlines',
+            'NK': 'Spirit Airlines',
+            'B6': 'JetBlue Airways'
+        }
+
+        def expand_list(codes, lookup):
+            out = []
+            for c in codes:
+                out.append({'code': c, 'name': lookup.get(c, None)})
+            return out
+
+        return {
+            'origins': expand_list(origin_codes, airport_names),
+            'dests': expand_list(dest_codes, airport_names),
+            'carriers': expand_list(carrier_codes, carrier_names)
+        }
+    except Exception as e:
+        return {'error': str(e)}
 
 @app.post("/api/v1/bmi")
 async def predict_bmi(payload: dict):

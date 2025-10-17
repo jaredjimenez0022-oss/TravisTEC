@@ -1,0 +1,771 @@
+[
+  {
+    "name": "root",
+    "result": {
+      "message": "Jarvis TEC API - Running"
+    }
+  },
+  {
+    "name": "health",
+    "result": {
+      "status": "healthy",
+      "services": {
+        "local_face_detector": true,
+        "model_runner": true,
+        "stt_service": false
+      }
+    }
+  },
+  {
+    "name": "list_models",
+    "result": {
+      "models": [
+        "airline_delay_model",
+        "avocado_model",
+        "bitcoin_model",
+        "bmi_model",
+        "car_price",
+        "chicago_crime",
+        "cirrhosis_model",
+        "london_crime_model",
+        "movie_recommender",
+        "sp500_model",
+        "car_model"
+      ]
+    }
+  },
+  {
+    "name": "predict_bitcoin",
+    "result": {
+      "model": "bitcoin_model",
+      "input": [
+        44745.47344566807,
+        44655.98249877673,
+        44611.237025331066,
+        44521.746078439726,
+        44700.727972222405,
+        44790.21891911374,
+        3.0
+      ],
+      "prediction": [
+        2507.0760000000014
+      ]
+    }
+  },
+  {
+    "name": "predict_avocado",
+    "result": {
+      "model": "avocado_model",
+      "horizon_months": 1,
+      "price_usd": 1.3501168542796569,
+      "target_date": "2018-04-01",
+      "raw": {
+        "model": "avocado_model",
+        "input": [
+          1.5151214128587258,
+          101008.09419058172,
+          50504.04709529086,
+          30302.428257174517,
+          10100.809419058172,
+          5050.404709529086,
+          4040.323767623269,
+          808.0647535246537,
+          202.01618838116343,
+          1.4999701987301386,
+          1.469667770472964,
+          1.4999701987301386,
+          1.0
+        ],
+        "prediction": [
+          1.3501168542796569
+        ]
+      }
+    }
+  },
+  {
+    "name": "predict_car",
+    "result": {
+      "model": "car_price",
+      "input": [
+        2015.0,
+        5.0,
+        50000.0,
+        0,
+        0,
+        0,
+        2
+      ],
+      "prediction": [
+        3.0890000000000013
+      ]
+    }
+  },
+  {
+    "name": "predict_bmi_endpoint",
+    "result": {
+      "model": "bmi_model",
+      "input": [
+        1.75,
+        70.0,
+        30.0
+      ],
+      "prediction": [
+        3.54
+      ]
+    }
+  },
+  {
+    "name": "predict_sp500",
+    "result": {
+      "model": "sp500_model",
+      "input": [
+        4595.431348817,
+        4618.408505561084,
+        4572.454192072915,
+        5350000,
+        17.52862686212287,
+        19.848550253271135,
+        4590.835917468183,
+        4581.645054770549,
+        4572.454192072915,
+        4595.431348817,
+        4604.622211514634,
+        7.0
+      ],
+      "prediction": [
+        111.66109930693068
+      ]
+    }
+  },
+  {
+    "name": "predict_london",
+    "result": {
+      "model": "london_crime_model",
+      "input": [
+        10.0,
+        4.0,
+        0.0
+      ],
+      "prediction": [
+        43.55101924419666
+      ]
+    }
+  },
+  {
+    "name": "predict_chicago",
+    "result": {
+      "model": "chicago_crime",
+      "input": {
+        "day_of_week": 4
+      },
+      "predicted_crimes": 527.474189258506,
+      "raw": {
+        "model": "chicago_crime",
+        "input": [
+          4.0
+        ],
+        "prediction": [
+          527.474189258506
+        ]
+      }
+    }
+  },
+  {
+    "name": "predict_cirrhosis",
+    "result": {
+      "model": "cirrhosis_model",
+      "input": {
+        "age": 50,
+        "bilirubin": 2.0,
+        "N_Days": 1000
+      },
+      "prediction_raw": [
+        2
+      ],
+      "prediction_label": "3",
+      "probabilities": [
+        [
+          0.135,
+          0.24,
+          0.33,
+          0.295
+        ]
+      ],
+      "raw": {
+        "model": "cirrhosis_model",
+        "input": [
+          1000.0,
+          50.0,
+          2.0,
+          280.0,
+          3.5,
+          70.0,
+          1200.0,
+          100.0,
+          100.0,
+          250.0,
+          11.0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "prediction": [
+          2
+        ],
+        "proba": [
+          [
+            0.135,
+            0.24,
+            0.33,
+            0.295
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "name": "predict_airline",
+    "result": {
+      "model": "airline_delay_model",
+      "input": {
+        "Month": 6,
+        "DayofMonth": 15,
+        "DayOfWeek": 3,
+        "CRSDepTime": 1200,
+        "CRSArrTime": 1400,
+        "CRSElapsedTime": 120,
+        "Distance": 500,
+        "Origin": "OTHER",
+        "Dest": "OTHER",
+        "UniqueCarrier": "XX"
+      },
+      "prediction": {
+        "delayed": true,
+        "probability": 0.7433957146796204
+      }
+    }
+  },
+  {
+    "name": "predict_movie",
+    "result": {
+      "model": "movie_recommender",
+      "input": {
+        "top_k": 1,
+        "genre": null,
+        "year": null
+      },
+      "prediction": [
+        "Shawshank Redemption, The (1994)"
+      ]
+    }
+  },
+  {
+    "name": "airline_metadata",
+    "result": {
+      "origins": [
+        {
+          "code": "ABQ",
+          "name": null
+        },
+        {
+          "code": "ATL",
+          "name": "Hartsfield\u2013Jackson Atlanta International Airport (ATL)"
+        },
+        {
+          "code": "AUS",
+          "name": null
+        },
+        {
+          "code": "BNA",
+          "name": null
+        },
+        {
+          "code": "BOS",
+          "name": "Logan International Airport (BOS)"
+        },
+        {
+          "code": "BWI",
+          "name": "Baltimore/Washington International Thurgood Marshall Airport (BWI)"
+        },
+        {
+          "code": "CLE",
+          "name": null
+        },
+        {
+          "code": "CLT",
+          "name": "Charlotte Douglas International Airport (CLT)"
+        },
+        {
+          "code": "CVG",
+          "name": null
+        },
+        {
+          "code": "DAL",
+          "name": null
+        },
+        {
+          "code": "DCA",
+          "name": null
+        },
+        {
+          "code": "DEN",
+          "name": "Denver International Airport (DEN)"
+        },
+        {
+          "code": "DFW",
+          "name": "Dallas/Fort Worth International Airport (DFW)"
+        },
+        {
+          "code": "DTW",
+          "name": null
+        },
+        {
+          "code": "EWR",
+          "name": "Newark Liberty International Airport (EWR)"
+        },
+        {
+          "code": "FLL",
+          "name": null
+        },
+        {
+          "code": "HOU",
+          "name": null
+        },
+        {
+          "code": "IAD",
+          "name": "Washington Dulles International Airport (IAD)"
+        },
+        {
+          "code": "IAH",
+          "name": "George Bush Intercontinental Airport (IAH)"
+        },
+        {
+          "code": "IND",
+          "name": "Indianapolis International Airport (IND)"
+        },
+        {
+          "code": "JFK",
+          "name": "John F. Kennedy International Airport (JFK)"
+        },
+        {
+          "code": "LAS",
+          "name": null
+        },
+        {
+          "code": "LAX",
+          "name": "Los Angeles International Airport (LAX)"
+        },
+        {
+          "code": "LGA",
+          "name": null
+        },
+        {
+          "code": "MCI",
+          "name": null
+        },
+        {
+          "code": "MCO",
+          "name": "Orlando International Airport (MCO)"
+        },
+        {
+          "code": "MDW",
+          "name": null
+        },
+        {
+          "code": "MEM",
+          "name": null
+        },
+        {
+          "code": "MIA",
+          "name": null
+        },
+        {
+          "code": "MKE",
+          "name": null
+        },
+        {
+          "code": "MSP",
+          "name": "Minneapolis\u2013Saint Paul International Airport (MSP)"
+        },
+        {
+          "code": "MSY",
+          "name": null
+        },
+        {
+          "code": "OAK",
+          "name": null
+        },
+        {
+          "code": "ONT",
+          "name": null
+        },
+        {
+          "code": "ORD",
+          "name": "O'Hare International Airport (ORD)"
+        },
+        {
+          "code": "OTHER",
+          "name": null
+        },
+        {
+          "code": "PDX",
+          "name": null
+        },
+        {
+          "code": "PHL",
+          "name": "Philadelphia International Airport (PHL)"
+        },
+        {
+          "code": "PHX",
+          "name": null
+        },
+        {
+          "code": "PIT",
+          "name": null
+        },
+        {
+          "code": "RDU",
+          "name": null
+        },
+        {
+          "code": "SAN",
+          "name": null
+        },
+        {
+          "code": "SAT",
+          "name": null
+        },
+        {
+          "code": "SEA",
+          "name": "Seattle\u2013Tacoma International Airport (SEA)"
+        },
+        {
+          "code": "SFO",
+          "name": "San Francisco International Airport (SFO)"
+        },
+        {
+          "code": "SJC",
+          "name": null
+        },
+        {
+          "code": "SLC",
+          "name": "Salt Lake City International Airport (SLC)"
+        },
+        {
+          "code": "SMF",
+          "name": null
+        },
+        {
+          "code": "SNA",
+          "name": null
+        },
+        {
+          "code": "STL",
+          "name": null
+        },
+        {
+          "code": "TPA",
+          "name": "Tampa International Airport (TPA)"
+        }
+      ],
+      "dests": [
+        {
+          "code": "ABQ",
+          "name": null
+        },
+        {
+          "code": "ATL",
+          "name": "Hartsfield\u2013Jackson Atlanta International Airport (ATL)"
+        },
+        {
+          "code": "AUS",
+          "name": null
+        },
+        {
+          "code": "BNA",
+          "name": null
+        },
+        {
+          "code": "BOS",
+          "name": "Logan International Airport (BOS)"
+        },
+        {
+          "code": "BWI",
+          "name": "Baltimore/Washington International Thurgood Marshall Airport (BWI)"
+        },
+        {
+          "code": "CLE",
+          "name": null
+        },
+        {
+          "code": "CLT",
+          "name": "Charlotte Douglas International Airport (CLT)"
+        },
+        {
+          "code": "CMH",
+          "name": null
+        },
+        {
+          "code": "CVG",
+          "name": null
+        },
+        {
+          "code": "DAL",
+          "name": null
+        },
+        {
+          "code": "DCA",
+          "name": null
+        },
+        {
+          "code": "DEN",
+          "name": "Denver International Airport (DEN)"
+        },
+        {
+          "code": "DFW",
+          "name": "Dallas/Fort Worth International Airport (DFW)"
+        },
+        {
+          "code": "DTW",
+          "name": null
+        },
+        {
+          "code": "EWR",
+          "name": "Newark Liberty International Airport (EWR)"
+        },
+        {
+          "code": "FLL",
+          "name": null
+        },
+        {
+          "code": "HOU",
+          "name": null
+        },
+        {
+          "code": "IAD",
+          "name": "Washington Dulles International Airport (IAD)"
+        },
+        {
+          "code": "IAH",
+          "name": "George Bush Intercontinental Airport (IAH)"
+        },
+        {
+          "code": "IND",
+          "name": "Indianapolis International Airport (IND)"
+        },
+        {
+          "code": "JFK",
+          "name": "John F. Kennedy International Airport (JFK)"
+        },
+        {
+          "code": "LAS",
+          "name": null
+        },
+        {
+          "code": "LAX",
+          "name": "Los Angeles International Airport (LAX)"
+        },
+        {
+          "code": "LGA",
+          "name": null
+        },
+        {
+          "code": "MCI",
+          "name": null
+        },
+        {
+          "code": "MCO",
+          "name": "Orlando International Airport (MCO)"
+        },
+        {
+          "code": "MDW",
+          "name": null
+        },
+        {
+          "code": "MEM",
+          "name": null
+        },
+        {
+          "code": "MIA",
+          "name": null
+        },
+        {
+          "code": "MKE",
+          "name": null
+        },
+        {
+          "code": "MSP",
+          "name": "Minneapolis\u2013Saint Paul International Airport (MSP)"
+        },
+        {
+          "code": "MSY",
+          "name": null
+        },
+        {
+          "code": "OAK",
+          "name": null
+        },
+        {
+          "code": "ORD",
+          "name": "O'Hare International Airport (ORD)"
+        },
+        {
+          "code": "OTHER",
+          "name": null
+        },
+        {
+          "code": "PDX",
+          "name": null
+        },
+        {
+          "code": "PHL",
+          "name": "Philadelphia International Airport (PHL)"
+        },
+        {
+          "code": "PHX",
+          "name": null
+        },
+        {
+          "code": "PIT",
+          "name": null
+        },
+        {
+          "code": "RDU",
+          "name": null
+        },
+        {
+          "code": "SAN",
+          "name": null
+        },
+        {
+          "code": "SAT",
+          "name": null
+        },
+        {
+          "code": "SEA",
+          "name": "Seattle\u2013Tacoma International Airport (SEA)"
+        },
+        {
+          "code": "SFO",
+          "name": "San Francisco International Airport (SFO)"
+        },
+        {
+          "code": "SJC",
+          "name": null
+        },
+        {
+          "code": "SLC",
+          "name": "Salt Lake City International Airport (SLC)"
+        },
+        {
+          "code": "SMF",
+          "name": null
+        },
+        {
+          "code": "SNA",
+          "name": null
+        },
+        {
+          "code": "STL",
+          "name": null
+        },
+        {
+          "code": "TPA",
+          "name": "Tampa International Airport (TPA)"
+        }
+      ],
+      "carriers": [
+        {
+          "code": "9E",
+          "name": null
+        },
+        {
+          "code": "AA",
+          "name": "American Airlines"
+        },
+        {
+          "code": "AQ",
+          "name": null
+        },
+        {
+          "code": "AS",
+          "name": null
+        },
+        {
+          "code": "B6",
+          "name": "JetBlue Airways"
+        },
+        {
+          "code": "CO",
+          "name": null
+        },
+        {
+          "code": "DL",
+          "name": "Delta Air Lines"
+        },
+        {
+          "code": "EV",
+          "name": null
+        },
+        {
+          "code": "F9",
+          "name": null
+        },
+        {
+          "code": "FL",
+          "name": null
+        },
+        {
+          "code": "HA",
+          "name": null
+        },
+        {
+          "code": "MQ",
+          "name": null
+        },
+        {
+          "code": "NW",
+          "name": null
+        },
+        {
+          "code": "OH",
+          "name": null
+        },
+        {
+          "code": "OO",
+          "name": null
+        },
+        {
+          "code": "UA",
+          "name": "United Airlines"
+        },
+        {
+          "code": "US",
+          "name": null
+        },
+        {
+          "code": "WN",
+          "name": "Southwest Airlines"
+        },
+        {
+          "code": "XE",
+          "name": null
+        },
+        {
+          "code": "YV",
+          "name": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "predict_bmi",
+    "result": {
+      "method": "bmi_model",
+      "bodyfat": 3.54
+    }
+  }
+]
